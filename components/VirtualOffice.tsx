@@ -55,23 +55,63 @@ export interface AgentActor {
 }
 
 const RUANGAN_LIST: RoomZone[] = [
-  { key: 'produk', label: 'Wing Barat &bull; Produk &amp; Stok', x0: -9.5, x1: -3.2, floorColor: 0x1f2e3d, rugColor: 0x10b981 },
-  { key: 'boardroom', label: 'Wing Tengah &bull; Boardroom &amp; Mission Board', x0: -3.2, x1: 3.2, floorColor: 0x1a2636, rugColor: 0x3b82f6 },
-  { key: 'konten', label: 'Wing Timur &bull; Konten, HR &amp; CS', x0: 3.2, x1: 9.5, floorColor: 0x271e36, rugColor: 0x8b5cf6 },
+  { key: 'admin', label: 'Wing Barat &bull; Ruang Komando WhatsApp (SANG ADMIN)', x0: -9.5, x1: -3.2, floorColor: 0x1f2e3d, rugColor: 0x3b82f6 },
+  { key: 'eksekutor', label: 'Wing Tengah &bull; Studio Eksekusi &amp; Boardroom (SANG EKSEKUTOR)', x0: -3.2, x1: 3.2, floorColor: 0x1a2636, rugColor: 0x10b981 },
+  { key: 'qc', label: 'Wing Timur &bull; Stasiun Verifikasi &amp; Quality Control (SANG QC)', x0: 3.2, x1: 9.5, floorColor: 0x271e36, rugColor: 0xf59e0b },
 ];
 
 const SKIN_TONES = ['#f1c7a5', '#d9a07b', '#e8b896', '#c68863', '#f0c09c', '#e2a77f', '#deb887', '#d2996c'];
 const HAIR_COLORS = ['#2b1d16', '#1b1330', '#5a3825', '#2b1d16', '#7a4a2a', '#1e1b4b', '#3b2f2f', '#1c1c1c'];
 
 const INITIAL_ACTORS: AgentActor[] = [
-  { id: 'produk', name: 'Mbak Rina', role: 'Katalog & Stok', room: 'Divisi Produk', emoji: '📦', shirtColor: '#10b981', skinColor: SKIN_TONES[0], hairColor: HAIR_COLORS[0], deskPos: [-6.8, 0, -2.5], triggers: ['produk', 'katalog', 'harga'], currentTask: 'Audit stok beras 5kg', ringkasan: initialLaporan.produk.ringkasan, urgent: initialLaporan.produk.mendesak, waiting: initialLaporan.produk.menunggu },
-  { id: 'antrian', name: 'Mas Doni', role: 'Nomor Antrian', room: 'Divisi Produk', emoji: '🎫', shirtColor: '#f59e0b', skinColor: SKIN_TONES[1], hairColor: HAIR_COLORS[1], deskPos: [-4.6, 0, 1.2], triggers: ['antrian', 'nomor'], currentTask: 'Panggil antrian #A-14', ringkasan: initialLaporan.antrian.ringkasan, urgent: initialLaporan.antrian.mendesak, waiting: initialLaporan.antrian.menunggu },
-  { id: 'pesanan', name: 'Mas Budi', role: 'Pesanan & Order', room: 'Divisi Transaksi', emoji: '🛒', shirtColor: '#3b82f6', skinColor: SKIN_TONES[2], hairColor: HAIR_COLORS[2], deskPos: [-1.6, 0, -2.5], triggers: ['pesan', 'order', 'beli'], currentTask: 'Proses checkout #WA-881', ringkasan: initialLaporan.pesanan.ringkasan, urgent: initialLaporan.pesanan.mendesak, waiting: initialLaporan.pesanan.menunggu },
-  { id: 'keuangan', name: 'Pak Hendra', role: 'Keuangan & Kas', room: 'Divisi Transaksi', emoji: '💰', shirtColor: '#ef4444', skinColor: SKIN_TONES[3], hairColor: HAIR_COLORS[3], deskPos: [1.6, 0, 1.2], triggers: ['omset', 'kas', 'laba'], currentTask: 'Rekap pembukuan kasir', ringkasan: initialLaporan.keuangan.ringkasan, urgent: initialLaporan.keuangan.mendesak, waiting: initialLaporan.keuangan.menunggu },
-  { id: 'absensi', name: 'Mbak Siti', role: 'HR & Absensi', room: 'Divisi Operasional', emoji: '📸', shirtColor: '#8b5cf6', skinColor: SKIN_TONES[4], hairColor: HAIR_COLORS[4], deskPos: [4.6, 0, -2.5], triggers: ['absen', 'hadir'], currentTask: 'Verifikasi selfie shift pagi', ringkasan: initialLaporan.absensi.ringkasan, urgent: initialLaporan.absensi.mendesak, waiting: initialLaporan.absensi.menunggu },
-  { id: 'konten', name: 'Jessica', role: 'Konten & Media', room: 'Divisi Kreatif', emoji: '✍️', shirtColor: '#ec4899', skinColor: SKIN_TONES[5], hairColor: HAIR_COLORS[5], deskPos: [6.8, 0, 1.2], triggers: ['caption', 'ide', 'post'], currentTask: 'Draft konten reels promo', ringkasan: initialLaporan.konten.ringkasan, urgent: initialLaporan.konten.mendesak, waiting: initialLaporan.konten.menunggu },
-  { id: 'support', name: 'Mas Arief', role: 'CS & FAQ WhatsApp', room: 'Divisi Support', emoji: '🤝', shirtColor: '#06b6d4', skinColor: SKIN_TONES[6], hairColor: HAIR_COLORS[6], deskPos: [7.2, 0, -2.5], triggers: ['faq', 'bantuan'], currentTask: 'Standby pesan WhatsApp 24/7', ringkasan: initialLaporan.support.ringkasan, urgent: initialLaporan.support.mendesak, waiting: initialLaporan.support.menunggu },
-  { id: 'echo', name: 'Mas Alex (Lead)', role: 'Tech & System Lead', room: 'Divisi IT', emoji: '🦜', shirtColor: '#64748b', skinColor: SKIN_TONES[7], hairColor: HAIR_COLORS[7], deskPos: [0, 0, -2.5], triggers: ['echo', 'ping'], currentTask: 'Server Cloudflare & Supabase normal', ringkasan: initialLaporan.echo.ringkasan, urgent: initialLaporan.echo.mendesak, waiting: initialLaporan.echo.menunggu },
+  {
+    id: 'admin',
+    name: 'SANG ADMIN',
+    role: 'WhatsApp Gateway & Orchestrator',
+    room: 'Ruang Komando WA',
+    emoji: '👑',
+    shirtColor: '#3b82f6',
+    skinColor: SKIN_TONES[0],
+    hairColor: HAIR_COLORS[0],
+    deskPos: [-5.5, 0, -2.0],
+    triggers: ['admin', 'wa', 'whatsapp', 'tugas', 'order', 'semua'],
+    currentTask: 'Terhubung ke WhatsApp Owner & siap delegasi tugas',
+    ringkasan: (initialLaporan as any).admin?.ringkasan || 'Gateway WhatsApp aktif terhubung ke nomor Anda.',
+    urgent: (initialLaporan as any).admin?.mendesak || [],
+    waiting: (initialLaporan as any).admin?.menunggu || [],
+  },
+  {
+    id: 'eksekutor',
+    name: 'SANG EKSEKUTOR',
+    role: 'Technical Builder & Execution',
+    room: 'Studio Eksekusi',
+    emoji: '⚡',
+    shirtColor: '#10b981',
+    skinColor: SKIN_TONES[2],
+    hairColor: HAIR_COLORS[2],
+    deskPos: [0, 0, -2.0],
+    triggers: ['eksekusi', 'kerjakan', 'buat', 'tulis', 'coding'],
+    currentTask: 'Mengeksekusi tugas teknis dari Sang Admin',
+    ringkasan: (initialLaporan as any).eksekutor?.ringkasan || 'Mengeksekusi seluruh instruksi dan menyerahkan ke QC.',
+    urgent: (initialLaporan as any).eksekutor?.mendesak || [],
+    waiting: (initialLaporan as any).eksekutor?.menunggu || [],
+  },
+  {
+    id: 'qc',
+    name: 'SANG QC',
+    role: 'Quality Assurance & Compliance',
+    room: 'Stasiun Verifikasi QC',
+    emoji: '🔍',
+    shirtColor: '#f59e0b',
+    skinColor: SKIN_TONES[4],
+    hairColor: HAIR_COLORS[4],
+    deskPos: [5.5, 0, -2.0],
+    triggers: ['qc', 'cek', 'verifikasi', 'validasi', 'review'],
+    currentTask: 'Menguji & memverifikasi hasil kerja Sang Eksekutor',
+    ringkasan: (initialLaporan as any).qc?.ringkasan || 'Memvalidasi hasil kerja eksekutor sebelum dilaporkan.',
+    urgent: (initialLaporan as any).qc?.mendesak || [],
+    waiting: (initialLaporan as any).qc?.menunggu || [],
+  },
 ];
 
 const TARGET_SPOTS = {
@@ -107,7 +147,8 @@ export default function VirtualOffice() {
   // Chat State
   const [chatInput, setChatInput] = useState('');
   const [chatLogs, setChatLogs] = useState<{ sender: string; text: string; time: string }[]>([
-    { sender: 'System', text: 'Kantor AI 3D Aktif. Seluruh agen AI duduk di kursi kerja masing-masing.', time: '11:00' },
+    { sender: 'System', text: 'Kantor AI 3D Aktif. Trio Agen Inti (SANG ADMIN, SANG EKSEKUTOR, SANG QC) siap di posisinya.', time: '11:00' },
+    { sender: '👑 SANG ADMIN', text: 'WhatsApp Gateway aktif & terhubung ke nomor Owner. Kirim pesan kapan saja!', time: '11:01' },
   ]);
 
   // Audio Context Ref
@@ -835,25 +876,67 @@ export default function VirtualOffice() {
     controlsRef.current.update();
   };
 
-  // Chat Submission
+  // Chat Submission & Multi-Agent Delegation Pipeline
   const handleSendCommand = (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatInput.trim() || !selectedAgent) return;
 
     const time = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-    const userMsg = { sender: 'Anda (Owner)', text: chatInput, time };
-
-    setTimeout(() => {
-      const botReply = {
-        sender: selectedAgent.name,
-        text: `🤖 [${selectedAgent.emoji} ${selectedAgent.name}]: Siap! Perintah "${chatInput}" sedang diproses.`,
-        time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
-      };
-      setChatLogs((prev) => [...prev, userMsg, botReply]);
-    }, 800);
-
-    setChatLogs((prev) => [...prev, userMsg]);
+    const userMsg = { sender: 'Anda (Owner via WhatsApp)', text: chatInput, time };
+    const prompt = chatInput;
     setChatInput('');
+    setChatLogs((prev) => [...prev, userMsg]);
+
+    if (selectedAgent.id === 'admin') {
+      // 1. SANG ADMIN acknowledges & dispatches to SANG EKSEKUTOR
+      setTimeout(() => {
+        const adminReply = {
+          sender: '👑 SANG ADMIN (WA Gateway)',
+          text: `Halo Bos! Pesan WhatsApp diterima: "${prompt}". Saya analisis instruksi ini dan langsung saya delegasikan ke SANG EKSEKUTOR.`,
+          time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+        };
+        setChatLogs((prev) => [...prev, adminReply]);
+      }, 700);
+
+      // 2. SANG EKSEKUTOR executes the task
+      setTimeout(() => {
+        const eksekutorReply = {
+          sender: '⚡ SANG EKSEKUTOR',
+          text: `Menerima tugas dari Sang Admin! Sedang mengeksekusi: "${prompt}"... Selesai dikerjakan! Berkas saya serahkan ke SANG QC untuk verifikasi kualitas.`,
+          time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+        };
+        setChatLogs((prev) => [...prev, eksekutorReply]);
+      }, 2200);
+
+      // 3. SANG QC audits & validates
+      setTimeout(() => {
+        const qcReply = {
+          sender: '🔍 SANG QC',
+          text: `Menerima berkas hasil pengerjaan dari Sang Eksekutor. Melakukan verifikasi ketelitian & uji kelayakan... [STATUS: PASS / LOLOS QC]. Siap dilaporkan ke Owner.`,
+          time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+        };
+        setChatLogs((prev) => [...prev, qcReply]);
+      }, 3800);
+
+      // 4. SANG ADMIN sends final report to Owner's WhatsApp
+      setTimeout(() => {
+        const finalReport = {
+          sender: '👑 SANG ADMIN (WA Gateway)',
+          text: `✅ [LAPORAN KE WA OWNER]: Bos, tugas "${prompt}" telah BERHASIL dieksekusi dan lolos verifikasi SANG QC tanpa catatan revisi. Data sinkron ke Supabase!`,
+          time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+        };
+        setChatLogs((prev) => [...prev, finalReport]);
+      }, 5400);
+    } else {
+      setTimeout(() => {
+        const botReply = {
+          sender: selectedAgent.name,
+          text: `[${selectedAgent.emoji} ${selectedAgent.name}]: Siap! Instruksi "${prompt}" sedang diproses dalam pipeline multi-agent.`,
+          time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+        };
+        setChatLogs((prev) => [...prev, botReply]);
+      }, 800);
+    }
   };
 
   return (

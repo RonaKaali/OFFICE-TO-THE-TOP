@@ -1,50 +1,30 @@
 {
-  "produk": {
-    "ringkasan": "Merapikan stok barang & harga diskon promo UMKM.",
-    "menunggu": ["Menunggu approval harga promo akhir pekan"],
+  "admin": {
+    "ringkasan": "Gateway WhatsApp aktif & terhubung ke nomor Owner. Menunggu dan mendelegasikan instruksi.",
+    "menunggu": ["Menunggu instruksi baru dari WhatsApp Owner"],
     "mendesak": [],
-    "angka": [{ "label": "SKU Aktif", "nilai": 48 }, { "label": "Restock", "nilai": 3 }]
+    "angka": [
+      { "label": "Pesan WA Masuk", "nilai": 12 },
+      { "label": "Tugas Didelegasikan", "nilai": 8 },
+      { "label": "Status WA Gateway", "nilai": "ONLINE" }
+    ]
   },
-  "pesanan": {
-    "ringkasan": "Memproses 15 invoice pesanan WhatsApp hari ini.",
+  "eksekutor": {
+    "ringkasan": "Mengeksekusi instruksi teknis, otomasi data, dan konten dari Sang Admin.",
     "menunggu": [],
-    "mendesak": ["Invoice #WA-881 minta kirim instan hari ini"],
-    "angka": [{ "label": "Pesanan Selesai", "nilai": 14 }, { "label": "Proses", "nilai": 1 }]
+    "mendesak": ["Menyelesaikan draf rekap otomatis untuk diserahkan ke QC"],
+    "angka": [
+      { "label": "Tugas Dikerjakan", "nilai": 5 },
+      { "label": "Siap Direview QC", "nilai": 2 }
+    ]
   },
-  "absensi": {
-    "ringkasan": "Verifikasi kehadiran selfie 18 karyawan cabang.",
-    "menunggu": ["1 izin sakit menunggu surat dokter"],
+  "qc": {
+    "ringkasan": "Melakukan validasi, pengujian logika, dan uji kepatuhan hasil Sang Eksekutor.",
+    "menunggu": ["Review kelayakan output tugas #TSK-082 dari Eksekutor"],
     "mendesak": [],
-    "angka": [{ "label": "Hadir", "nilai": 17 }, { "label": "Shift Pagi", "nilai": 10 }]
-  },
-  "antrian": {
-    "ringkasan": "Mengatur antrian digital toko offline & klinik.",
-    "menunggu": [],
-    "mendesak": [],
-    "angka": [{ "label": "Nomor Dipanggil", "nilai": 42 }, { "label": "Sisa Antrian", "nilai": 3 }]
-  },
-  "keuangan": {
-    "ringkasan": "Rekap omset harian & pencatatan buku kas masuk.",
-    "menunggu": ["Verifikasi nota belanja operasional"],
-    "mendesak": [],
-    "angka": [{ "label": "Omset Hari Ini", "nilai": "Rp 4.250.000" }]
-  },
-  "konten": {
-    "ringkasan": "Menyusun 3 draft caption TikTok & ide reels mingguan.",
-    "menunggu": ["Persetujuan naskah video dari Owner"],
-    "mendesak": [],
-    "angka": [{ "label": "Draft Konten", "nilai": 3 }]
-  },
-  "support": {
-    "ringkasan": "Menjawab 65 pertanyaan FAQ pelanggan secara otomatis.",
-    "menunggu": [],
-    "mendesak": [],
-    "angka": [{ "label": "Pesan Dibalas", "nilai": 65 }]
-  },
-  "echo": {
-    "ringkasan": "Gateway WhatsApp & API server berjalan normal 100%.",
-    "menunggu": [],
-    "mendesak": [],
-    "angka": [{ "label": "Latency", "nilai": "24ms" }]
+    "angka": [
+      { "label": "Lolos Verifikasi (PASS)", "nilai": 7 },
+      { "label": "Perlu Revisi (REVISE)", "nilai": 1 }
+    ]
   }
 }
