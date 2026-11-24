@@ -1,0 +1,53 @@
+{
+  "name": "office-to-the-top",
+  "version": "1.0.0",
+  "description": "Local-first multi-agent WhatsApp system for WEBSITE GENZ - No Docker, No VPS, Free",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start:web": "next start",
+    "evolution:install": "cd evolution-api && npm install",
+    "evolution:build": "cd evolution-api && npm run build",
+    "evolution:start": "cd evolution-api && npm start",
+    "evolution:dev": "cd evolution-api && npm run start:dev",
+    "playwright:install": "npx playwright install chromium --with-deps",
+    "setup": "powershell -ExecutionPolicy Bypass -File scripts/setup-native.ps1",
+    "start": "powershell -ExecutionPolicy Bypass -File scripts/start-stack.ps1",
+    "stop": "powershell -ExecutionPolicy Bypass -File scripts/stop-stack.ps1",
+    "tunnel": "powershell -ExecutionPolicy Bypass -File scripts/cloudflare-tunnel.ps1",
+    "autostart:setup": "powershell -ExecutionPolicy Bypass -File scripts/setup-auto-start.ps1",
+    "test:echo": "powershell -ExecutionPolicy Bypass -File scripts/test-echo.ps1",
+    "db:init": "node scripts/init-db.js",
+    "db:seed": "node scripts/seed-agents.js",
+    "client:deploy": "powershell -ExecutionPolicy Bypass -File scripts/deploy-client.ps1"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.119.2",
+    "@tailwindcss/postcss": "^4.3.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "autoprefixer": "^10.7.0",
+    "axios": "^1.7.2",
+    "dotenv": "^16.4.5",
+    "lucide-react": "^1.78.0",
+    "next": "^16.4.6",
+    "playwright": "^1.45.0",
+    "postcss": "^8.5.33",
+    "qrcode-terminal": "^0.12.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "sql.js": "^1.12.0",
+    "tailwindcss": "^4.3.5",
+    "typescript": "^7.0.2",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
