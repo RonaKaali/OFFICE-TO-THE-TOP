@@ -2,9 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { 
   Building2, 
   Volume2, 
@@ -22,7 +20,8 @@ import {
   Flame,
   CheckCircle2,
   Sparkles,
-  MessageSquare
+  Coffee,
+  Users
 } from 'lucide-react';
 import initialLaporan from '@/src/laporan.json';
 
@@ -43,9 +42,11 @@ export interface AgentActor {
   role: string;
   room: string;
   emoji: string;
-  color: string;
+  shirtColor: string;
+  skinColor: string;
+  hairColor: string;
   deskPos: [number, number, number];
-  rotationY: number;
+  rotationY?: number;
   triggers: string[];
   currentTask: string;
   ringkasan: string;
@@ -54,26 +55,30 @@ export interface AgentActor {
 }
 
 const RUANGAN_LIST: RoomZone[] = [
-  { key: 'produk', label: 'Divisi Produk & Inventaris', x0: -7.5, x1: -2.5, floorColor: 0x1e2d3d, rugColor: 0x10b981 },
-  { key: 'pesanan', label: 'Ruang Rapat & Mission Board', x0: -2.5, x1: 2.5, floorColor: 0x172233, rugColor: 0x3b82f6 },
-  { key: 'konten', label: 'Divisi Konten, HR & Support', x0: 2.5, x1: 7.5, floorColor: 0x241d33, rugColor: 0x8b5cf6 },
+  { key: 'produk', label: 'Wing Barat &bull; Produk &amp; Stok', x0: -9.5, x1: -3.2, floorColor: 0x1f2e3d, rugColor: 0x10b981 },
+  { key: 'boardroom', label: 'Wing Tengah &bull; Boardroom &amp; Mission Board', x0: -3.2, x1: 3.2, floorColor: 0x1a2636, rugColor: 0x3b82f6 },
+  { key: 'konten', label: 'Wing Timur &bull; Konten, HR &amp; CS', x0: 3.2, x1: 9.5, floorColor: 0x271e36, rugColor: 0x8b5cf6 },
 ];
+
+const SKIN_TONES = ['#f1c7a5', '#d9a07b', '#e8b896', '#c68863', '#f0c09c', '#e2a77f', '#deb887', '#d2996c'];
+const HAIR_COLORS = ['#2b1d16', '#1b1330', '#5a3825', '#2b1d16', '#7a4a2a', '#1e1b4b', '#3b2f2f', '#1c1c1c'];
 
 const INITIAL_ACTORS: AgentActor[] = [
-  { id: 'produk', name: 'Mbak Rina', role: 'Katalog & Stok', room: 'Divisi Produk', emoji: '📦', color: '#10b981', deskPos: [-5.2, 0, -2], rotationY: 0, triggers: ['produk', 'katalog', 'harga'], currentTask: 'Audit stok beras 5kg', ringkasan: initialLaporan.produk.ringkasan, urgent: initialLaporan.produk.mendesak, waiting: initialLaporan.produk.menunggu },
-  { id: 'antrian', name: 'Doni', role: 'Nomor Antrian', room: 'Divisi Produk', emoji: '🎫', color: '#f59e0b', deskPos: [-3.8, 0, 1.2], rotationY: Math.PI, triggers: ['antrian', 'nomor'], currentTask: 'Panggil antrian #A-14', ringkasan: initialLaporan.antrian.ringkasan, urgent: initialLaporan.antrian.mendesak, waiting: initialLaporan.antrian.menunggu },
-  { id: 'pesanan', name: 'Mas Budi', role: 'Pesanan & Order', room: 'Divisi Transaksi', emoji: '🛒', color: '#3b82f6', deskPos: [-1.2, 0, -2], rotationY: 0, triggers: ['pesan', 'order', 'beli'], currentTask: 'Proses invoice #WA-881', ringkasan: initialLaporan.pesanan.ringkasan, urgent: initialLaporan.pesanan.mendesak, waiting: initialLaporan.pesanan.menunggu },
-  { id: 'keuangan', name: 'Pak Hendra', role: 'Keuangan & Kas', room: 'Divisi Transaksi', emoji: '💰', color: '#ef4444', deskPos: [1.2, 0, 1.2], rotationY: Math.PI, triggers: ['omset', 'kas', 'laba'], currentTask: 'Rekap pembukuan kasir', ringkasan: initialLaporan.keuangan.ringkasan, urgent: initialLaporan.keuangan.mendesak, waiting: initialLaporan.keuangan.menunggu },
-  { id: 'absensi', name: 'Siti', role: 'HR & Absensi', room: 'Divisi Operasional', emoji: '📸', color: '#8b5cf6', deskPos: [3.8, 0, -2], rotationY: 0, triggers: ['absen', 'hadir'], currentTask: 'Verifikasi selfie shift pagi', ringkasan: initialLaporan.absensi.ringkasan, urgent: initialLaporan.absensi.mendesak, waiting: initialLaporan.absensi.menunggu },
-  { id: 'konten', name: 'Jessica', role: 'Konten & Media', room: 'Divisi Kreatif', emoji: '✍️', color: '#ec4899', deskPos: [5.2, 0, 1.2], rotationY: Math.PI, triggers: ['caption', 'ide', 'post'], currentTask: 'Draft konten reels promo', ringkasan: initialLaporan.konten.ringkasan, urgent: initialLaporan.konten.mendesak, waiting: initialLaporan.konten.menunggu },
-  { id: 'support', name: 'Arief', role: 'CS & FAQ WhatsApp', room: 'Divisi Support', emoji: '🤝', color: '#06b6d4', deskPos: [5.8, 0, -2], rotationY: 0, triggers: ['faq', 'bantuan'], currentTask: 'Standby pesan WhatsApp 24/7', ringkasan: initialLaporan.support.ringkasan, urgent: initialLaporan.support.mendesak, waiting: initialLaporan.support.menunggu },
-  { id: 'echo', name: 'Echo Bot', role: 'Server Gateway', room: 'Divisi IT', emoji: '🦜', color: '#6b7280', deskPos: [0, 0, -2], rotationY: 0, triggers: ['echo', 'ping'], currentTask: 'Status API server normal', ringkasan: initialLaporan.echo.ringkasan, urgent: initialLaporan.echo.mendesak, waiting: initialLaporan.echo.menunggu },
+  { id: 'produk', name: 'Mbak Rina', role: 'Katalog & Stok', room: 'Divisi Produk', emoji: '📦', shirtColor: '#10b981', skinColor: SKIN_TONES[0], hairColor: HAIR_COLORS[0], deskPos: [-6.8, 0, -2.5], triggers: ['produk', 'katalog', 'harga'], currentTask: 'Audit stok beras 5kg', ringkasan: initialLaporan.produk.ringkasan, urgent: initialLaporan.produk.mendesak, waiting: initialLaporan.produk.menunggu },
+  { id: 'antrian', name: 'Mas Doni', role: 'Nomor Antrian', room: 'Divisi Produk', emoji: '🎫', shirtColor: '#f59e0b', skinColor: SKIN_TONES[1], hairColor: HAIR_COLORS[1], deskPos: [-4.6, 0, 1.2], triggers: ['antrian', 'nomor'], currentTask: 'Panggil antrian #A-14', ringkasan: initialLaporan.antrian.ringkasan, urgent: initialLaporan.antrian.mendesak, waiting: initialLaporan.antrian.menunggu },
+  { id: 'pesanan', name: 'Mas Budi', role: 'Pesanan & Order', room: 'Divisi Transaksi', emoji: '🛒', shirtColor: '#3b82f6', skinColor: SKIN_TONES[2], hairColor: HAIR_COLORS[2], deskPos: [-1.6, 0, -2.5], triggers: ['pesan', 'order', 'beli'], currentTask: 'Proses checkout #WA-881', ringkasan: initialLaporan.pesanan.ringkasan, urgent: initialLaporan.pesanan.mendesak, waiting: initialLaporan.pesanan.menunggu },
+  { id: 'keuangan', name: 'Pak Hendra', role: 'Keuangan & Kas', room: 'Divisi Transaksi', emoji: '💰', shirtColor: '#ef4444', skinColor: SKIN_TONES[3], hairColor: HAIR_COLORS[3], deskPos: [1.6, 0, 1.2], triggers: ['omset', 'kas', 'laba'], currentTask: 'Rekap pembukuan kasir', ringkasan: initialLaporan.keuangan.ringkasan, urgent: initialLaporan.keuangan.mendesak, waiting: initialLaporan.keuangan.menunggu },
+  { id: 'absensi', name: 'Mbak Siti', role: 'HR & Absensi', room: 'Divisi Operasional', emoji: '📸', shirtColor: '#8b5cf6', skinColor: SKIN_TONES[4], hairColor: HAIR_COLORS[4], deskPos: [4.6, 0, -2.5], triggers: ['absen', 'hadir'], currentTask: 'Verifikasi selfie shift pagi', ringkasan: initialLaporan.absensi.ringkasan, urgent: initialLaporan.absensi.mendesak, waiting: initialLaporan.absensi.menunggu },
+  { id: 'konten', name: 'Jessica', role: 'Konten & Media', room: 'Divisi Kreatif', emoji: '✍️', shirtColor: '#ec4899', skinColor: SKIN_TONES[5], hairColor: HAIR_COLORS[5], deskPos: [6.8, 0, 1.2], triggers: ['caption', 'ide', 'post'], currentTask: 'Draft konten reels promo', ringkasan: initialLaporan.konten.ringkasan, urgent: initialLaporan.konten.mendesak, waiting: initialLaporan.konten.menunggu },
+  { id: 'support', name: 'Mas Arief', role: 'CS & FAQ WhatsApp', room: 'Divisi Support', emoji: '🤝', shirtColor: '#06b6d4', skinColor: SKIN_TONES[6], hairColor: HAIR_COLORS[6], deskPos: [7.2, 0, -2.5], triggers: ['faq', 'bantuan'], currentTask: 'Standby pesan WhatsApp 24/7', ringkasan: initialLaporan.support.ringkasan, urgent: initialLaporan.support.mendesak, waiting: initialLaporan.support.menunggu },
+  { id: 'echo', name: 'Mas Alex (Lead)', role: 'Tech & System Lead', room: 'Divisi IT', emoji: '🦜', shirtColor: '#64748b', skinColor: SKIN_TONES[7], hairColor: HAIR_COLORS[7], deskPos: [0, 0, -2.5], triggers: ['echo', 'ping'], currentTask: 'Server Cloudflare & Supabase normal', ringkasan: initialLaporan.echo.ringkasan, urgent: initialLaporan.echo.mendesak, waiting: initialLaporan.echo.menunggu },
 ];
 
-const SPOTS = {
-  kopi: new THREE.Vector3(-5.2, 0, 3.2),
-  papan: new THREE.Vector3(0, 0, -3.2),
-  sofa: new THREE.Vector3(5.2, 0, 3.2),
+const TARGET_SPOTS = {
+  kopi: new THREE.Vector3(-6.8, 0, 3.8),
+  papan: new THREE.Vector3(0, 0, -3.8),
+  sofa: new THREE.Vector3(6.8, 0, 3.8),
+  meeting: new THREE.Vector3(0, 0, 1.4),
 };
 
 export default function VirtualOffice() {
@@ -84,11 +89,10 @@ export default function VirtualOffice() {
   const [isTimelapse, setIsTimelapse] = useState(false);
   const [clockTime, setClockTime] = useState('11:00');
   const [audioPlaying, setAudioPlaying] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const [showMissionBoard, setShowMissionBoard] = useState(false);
   const [themeDropdownOpen, setThemeDropdownOpen] = useState(false);
 
-  // Floating Labels state
+  // Floating HTML Bubbles State
   const [bubbles, setBubbles] = useState<Array<{
     id: string;
     name: string;
@@ -100,38 +104,40 @@ export default function VirtualOffice() {
     visible: boolean;
   }>>([]);
 
-  // Chat simulation state
+  // Chat State
   const [chatInput, setChatInput] = useState('');
   const [chatLogs, setChatLogs] = useState<{ sender: string; text: string; time: string }[]>([
-    { sender: 'System', text: 'Kantor AI 3D Aktif. Seluruh agen beroperasi secara otonom.', time: '11:00' },
+    { sender: 'System', text: 'Kantor AI 3D Aktif. Seluruh agen AI duduk di kursi kerja masing-masing.', time: '11:00' },
   ]);
 
   // Audio Context Ref
   const audioCtxRef = useRef<AudioContext | null>(null);
   const audioIntervalRef = useRef<any>(null);
 
-  // Three.js References
+  // Three.js Scene References
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.OrthographicCamera | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
-  const hemiLightRef = useRef<THREE.HemisphereLight | null>(null);
-  const dirLightRef = useRef<THREE.DirectionalLight | null>(null);
-  const deskMeshesRef = useRef<Map<string, THREE.Mesh>>(new Map());
 
-  // Mixers and Actors Map
-  const actorObjectsRef = useRef<Map<string, {
-    mixer: THREE.AnimationMixer;
-    actions: Map<string, THREE.AnimationAction>;
-    currentActionName: string;
-    model: THREE.Group;
+  // Procedural Actors Ref
+  const actorsMapRef = useRef<Map<string, {
+    root: THREE.Group;
+    body: THREE.Mesh;
+    head: THREE.Mesh;
+    armL: THREE.Mesh;
+    armR: THREE.Mesh;
+    legL: THREE.Mesh;
+    legR: THREE.Mesh;
+    chairGroup: THREE.Group;
     seatPos: THREE.Vector3;
     currentPos: THREE.Vector3;
     isWalking: boolean;
     deskMesh: THREE.Mesh;
+    laptopLight: THREE.PointLight;
   }>>(new Map());
 
-  // Web Audio Synthesizer
+  // Web Audio Synth (72 BPM)
   const toggleAudio = () => {
     if (!audioPlaying) {
       try {
@@ -161,7 +167,7 @@ export default function VirtualOffice() {
 
         setAudioPlaying(true);
       } catch (e) {
-        console.error('Audio failed', e);
+        console.error('Audio error', e);
       }
     } else {
       if (audioIntervalRef.current) clearInterval(audioIntervalRef.current);
@@ -192,20 +198,20 @@ export default function VirtualOffice() {
 
     // 2. Isometric Orthographic Camera
     const aspect = width / height;
-    const frustumSize = 13.5;
+    const frustumSize = 16.5; // Bigger field of view for large office
     const camera = new THREE.OrthographicCamera(
       (-frustumSize * aspect) / 2,
       (frustumSize * aspect) / 2,
       frustumSize / 2,
       -frustumSize / 2,
       0.1,
-      100
+      120
     );
     cameraRef.current = camera;
-    camera.position.set(14, 14, 14);
-    camera.lookAt(0, 0, 0);
+    camera.position.set(16, 16, 16);
+    camera.lookAt(0, 0.4, 0);
 
-    // 3. Renderer with antialiasing and shadows
+    // 3. Renderer with antialiasing and soft shadows
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
     rendererRef.current = renderer;
     renderer.setSize(width, height);
@@ -220,95 +226,34 @@ export default function VirtualOffice() {
     controlsRef.current = controls;
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
-    controls.target.set(0, 0.4, 0);
+    controls.target.set(0, 0.5, 0);
     controls.maxPolarAngle = Math.PI / 2 - 0.05;
     controls.minZoom = 0.5;
-    controls.maxZoom = 2.5;
+    controls.maxZoom = 2.8;
 
     // 5. Lighting Setup
-    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.6);
-    hemiLight.position.set(0, 20, 0);
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.7);
+    hemiLight.position.set(0, 25, 0);
     scene.add(hemiLight);
-    hemiLightRef.current = hemiLight;
 
-    const dirLight = new THREE.DirectionalLight(0xfff8ee, 2.3);
-    dirLight.position.set(14, 20, 12);
+    const dirLight = new THREE.DirectionalLight(0xfff8ee, 2.4);
+    dirLight.position.set(16, 22, 14);
     dirLight.castShadow = true;
     dirLight.shadow.mapSize.width = 1024;
     dirLight.shadow.mapSize.height = 1024;
     dirLight.shadow.camera.near = 0.5;
-    dirLight.shadow.camera.far = 40;
-    dirLight.shadow.camera.left = -11;
-    dirLight.shadow.camera.right = 11;
-    dirLight.shadow.camera.top = 11;
-    dirLight.shadow.camera.bottom = -11;
+    dirLight.shadow.camera.far = 50;
+    dirLight.shadow.camera.left = -14;
+    dirLight.shadow.camera.right = 14;
+    dirLight.shadow.camera.top = 14;
+    dirLight.shadow.camera.bottom = -14;
     dirLight.shadow.bias = -0.0005;
     scene.add(dirLight);
-    dirLightRef.current = dirLight;
 
-    // 6. Build Architectural Multi-Room Office
-    buildRooms(scene, gaya);
+    // 6. Build Enlarged Multi-Room Office Architecture & Furniture
+    buildEnlargedOffice(scene, gaya);
 
-    // 7. Load GLB Characters with GLTFLoader & AnimationMixer
-    const loader = new GLTFLoader();
-    setIsLoading(true);
-
-    loader.load(
-      '/models/robot.glb',
-      (gltf) => {
-        setIsLoading(false);
-        const originalScene = gltf.scene;
-        const animations = gltf.animations;
-
-        INITIAL_ACTORS.forEach((actor) => {
-          const clone = SkeletonUtils.clone(originalScene) as THREE.Group;
-          clone.scale.set(0.44, 0.44, 0.44);
-          clone.position.set(actor.deskPos[0], actor.deskPos[1], actor.deskPos[2]);
-          clone.rotation.y = actor.rotationY;
-
-          clone.traverse((child: any) => {
-            if (child.isMesh) {
-              child.castShadow = true;
-              child.receiveShadow = true;
-              child.userData = { agentId: actor.id };
-            }
-          });
-
-          scene.add(clone);
-
-          const mixer = new THREE.AnimationMixer(clone);
-          const actionsMap = new Map<string, THREE.AnimationAction>();
-
-          animations.forEach((clip) => {
-            const action = mixer.clipAction(clip);
-            actionsMap.set(clip.name, action);
-          });
-
-          const initialAction = actionsMap.get('Sitting') || actionsMap.get('Idle');
-          if (initialAction) initialAction.play();
-
-          const desk = deskMeshesRef.current.get(actor.id)!;
-
-          actorObjectsRef.current.set(actor.id, {
-            mixer,
-            actions: actionsMap,
-            currentActionName: 'Sitting',
-            model: clone,
-            seatPos: new THREE.Vector3(actor.deskPos[0], actor.deskPos[1], actor.deskPos[2]),
-            currentPos: new THREE.Vector3(actor.deskPos[0], actor.deskPos[1], actor.deskPos[2]),
-            isWalking: false,
-            deskMesh: desk,
-          });
-        });
-      },
-      undefined,
-      (err) => {
-        console.error('Failed to load GLB:', err);
-        setIsLoading(false);
-      }
-    );
-
-    // 8. Raycasting Mouse Click to open character popup
+    // 7. Raycasting for Clicking Characters & Desks
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
 
@@ -332,7 +277,6 @@ export default function VirtualOffice() {
             const target = INITIAL_ACTORS.find((a) => a.id === currentObj.userData.agentId);
             if (target) {
               setSelectedAgent(target);
-              triggerActorAnimation(target.id, 'Wave');
               return;
             }
           }
@@ -343,7 +287,7 @@ export default function VirtualOffice() {
 
     renderer.domElement.addEventListener('pointerdown', handlePointerDown);
 
-    // 9. Autonomous Agents Pathfinding & Render Loop
+    // 8. Animation Loop (Autonomous Walking & Sitting Animations)
     let animId: number;
     let clock = new THREE.Clock();
     let totalTime = 0;
@@ -355,64 +299,86 @@ export default function VirtualOffice() {
       const delta = clock.getDelta();
       totalTime += delta;
 
-      // Update Mixers and Autonomous Walking
-      actorObjectsRef.current.forEach((actorData, agentId) => {
-        actorData.mixer.update(delta);
+      const curW = container.clientWidth || window.innerWidth;
+      const curH = container.clientHeight || window.innerHeight;
 
+      // Update Each Procedural Character
+      actorsMapRef.current.forEach((actorData, agentId) => {
         const idx = INITIAL_ACTORS.findIndex((a) => a.id === agentId);
-        const shifted = totalTime * (isTimelapse ? 2.5 : 1) + idx * 5.3;
-        const cycle = ((shifted % 20) + 20) % 20;
+        const speedMultiplier = isTimelapse ? 3.0 : 1.0;
+        const shifted = totalTime * speedMultiplier + idx * 5.7;
+        const cycle = ((shifted % 22) + 22) % 22;
 
-        let targetSpot = SPOTS.kopi;
-        if (idx % 3 === 1) targetSpot = SPOTS.papan;
-        if (idx % 3 === 2) targetSpot = SPOTS.sofa;
+        let targetSpot = TARGET_SPOTS.kopi;
+        if (idx % 4 === 1) targetSpot = TARGET_SPOTS.papan;
+        if (idx % 4 === 2) targetSpot = TARGET_SPOTS.sofa;
+        if (idx % 4 === 3) targetSpot = TARGET_SPOTS.meeting;
 
         const seat = actorData.seatPos;
 
-        if (cycle < 3) {
-          // Walking to spot
-          const k = smoothStep(cycle / 3);
+        if (cycle < 3.2) {
+          // Walking to Target Spot
+          actorData.isWalking = true;
+          const k = smoothStep(cycle / 3.2);
           actorData.currentPos.lerpVectors(seat, targetSpot, k);
-          actorData.model.position.copy(actorData.currentPos);
-          actorData.model.lookAt(targetSpot.x, 0, targetSpot.z);
+          actorData.root.position.copy(actorData.currentPos);
+          actorData.root.lookAt(targetSpot.x, 0, targetSpot.z);
 
-          if (!actorData.isWalking) {
-            actorData.isWalking = true;
-            crossFade(actorData, 'Walking');
-          }
-        } else if (cycle < 10) {
-          // Relaxing at spot
-          actorData.model.position.copy(targetSpot);
+          // Limb swinging animation while walking
+          const swing = Math.sin(totalTime * 10);
+          actorData.legL.rotation.x = swing * 0.55;
+          actorData.legR.rotation.x = -swing * 0.55;
+          actorData.armL.rotation.x = -swing * 0.45;
+          actorData.armR.rotation.x = swing * 0.45;
+          actorData.root.position.y = Math.abs(Math.sin(totalTime * 10)) * 0.08;
+        } else if (cycle < 10.5) {
+          // Standing / Relaxing at Target Spot
+          actorData.isWalking = false;
+          actorData.currentPos.copy(targetSpot);
+          actorData.root.position.copy(targetSpot);
 
-          if (actorData.isWalking) {
-            actorData.isWalking = false;
-            const spotAnim = idx % 3 === 2 ? 'Sitting' : idx % 3 === 1 ? 'Idle' : 'Wave';
-            crossFade(actorData, spotAnim);
-          }
-        } else if (cycle < 13) {
-          // Walking back to desk
-          const k = smoothStep((cycle - 10) / 3);
+          // Subtle idle breathing
+          actorData.legL.rotation.x = 0;
+          actorData.legR.rotation.x = 0;
+          actorData.armL.rotation.x = Math.sin(totalTime * 2) * 0.08;
+          actorData.armR.rotation.x = -Math.sin(totalTime * 2) * 0.08;
+          actorData.head.rotation.y = Math.sin(totalTime * 1.5) * 0.2;
+          actorData.root.position.y = 0;
+        } else if (cycle < 14.0) {
+          // Walking back to Chair
+          actorData.isWalking = true;
+          const k = smoothStep((cycle - 10.5) / 3.5);
           actorData.currentPos.lerpVectors(targetSpot, seat, k);
-          actorData.model.position.copy(actorData.currentPos);
-          actorData.model.lookAt(seat.x, 0, seat.z);
+          actorData.root.position.copy(actorData.currentPos);
+          actorData.root.lookAt(seat.x, 0, seat.z);
 
-          if (!actorData.isWalking) {
-            actorData.isWalking = true;
-            crossFade(actorData, 'Walking');
-          }
+          const swing = Math.sin(totalTime * 10);
+          actorData.legL.rotation.x = swing * 0.55;
+          actorData.legR.rotation.x = -swing * 0.55;
+          actorData.armL.rotation.x = -swing * 0.45;
+          actorData.armR.rotation.x = swing * 0.45;
+          actorData.root.position.y = Math.abs(Math.sin(totalTime * 10)) * 0.08;
         } else {
-          // At desk working
-          actorData.model.position.copy(seat);
-          const defaultRot = INITIAL_ACTORS[idx]?.rotationY || 0;
-          actorData.model.rotation.set(0, defaultRot, 0);
+          // Sitting on the Chair at the Desk Working!
+          actorData.isWalking = false;
+          actorData.currentPos.copy(seat);
+          actorData.root.position.copy(seat);
+          actorData.root.rotation.set(0, 0, 0); // Face the desk
 
-          if (actorData.isWalking) {
-            actorData.isWalking = false;
-            crossFade(actorData, 'Sitting');
-          }
+          // Sitting pose: legs bent 90 degrees forward
+          actorData.legL.rotation.x = -Math.PI / 2.2;
+          actorData.legR.rotation.x = -Math.PI / 2.2;
+
+          // Hands typing on laptop keyboard
+          const typing = Math.sin(totalTime * 12 + idx);
+          actorData.armL.rotation.x = -Math.PI / 3.2 + typing * 0.12;
+          actorData.armR.rotation.x = -Math.PI / 3.2 - typing * 0.12;
+          actorData.head.rotation.x = 0.15; // looking down at screen
+          actorData.head.rotation.y = Math.sin(totalTime * 1.2 + idx) * 0.08;
+          actorData.root.position.y = 0;
         }
 
-        // Urgent alert pulsing red desk
+        // Pulse desk light if urgent
         const actorMeta = INITIAL_ACTORS[idx];
         if (actorMeta && actorMeta.urgent.length > 0 && actorData.deskMesh) {
           const pulse = (Math.sin(totalTime * 6) + 1) * 0.5;
@@ -421,16 +387,13 @@ export default function VirtualOffice() {
         }
       });
 
-      // Update Floating HTML Bubble Positions
-      const curW = container.clientWidth || window.innerWidth;
-      const curH = container.clientHeight || window.innerHeight;
+      // Update Floating HTML Bubbles
       const newBubbles: typeof bubbles = [];
-
-      actorObjectsRef.current.forEach((actorData, agentId) => {
+      actorsMapRef.current.forEach((actorData, agentId) => {
         const actorMeta = INITIAL_ACTORS.find((a) => a.id === agentId);
         if (!actorMeta) return;
 
-        const headPos = actorData.currentPos.clone().add(new THREE.Vector3(0, 1.5, 0));
+        const headPos = actorData.currentPos.clone().add(new THREE.Vector3(0, 1.7, 0));
         headPos.project(camera);
 
         const x = ((headPos.x + 1) * curW) / 2;
@@ -438,13 +401,15 @@ export default function VirtualOffice() {
 
         let statusText = actorMeta.ringkasan;
         if (actorData.isWalking) {
-          statusText = '🚶 Berpindah ruangan...';
-        } else if (actorData.currentPos.distanceTo(SPOTS.kopi) < 0.5) {
-          statusText = '☕ Ngopi dulu di Pantry';
-        } else if (actorData.currentPos.distanceTo(SPOTS.papan) < 0.5) {
-          statusText = '📋 Cek Mission Board';
-        } else if (actorData.currentPos.distanceTo(SPOTS.sofa) < 0.5) {
-          statusText = '🛋️ Diskusi di Sofa';
+          statusText = '🚶 Berpindah ke area lain...';
+        } else if (actorData.currentPos.distanceTo(TARGET_SPOTS.kopi) < 0.6) {
+          statusText = '☕ Ngopi santai di Pantry';
+        } else if (actorData.currentPos.distanceTo(TARGET_SPOTS.papan) < 0.6) {
+          statusText = '📋 Membaca Mission Board';
+        } else if (actorData.currentPos.distanceTo(TARGET_SPOTS.sofa) < 0.6) {
+          statusText = '🛋️ Diskusi santai di Sofa';
+        } else if (actorData.currentPos.distanceTo(TARGET_SPOTS.meeting) < 0.6) {
+          statusText = '📊 Koordinasi di Meja Rapat';
         }
 
         newBubbles.push({
@@ -461,7 +426,7 @@ export default function VirtualOffice() {
 
       setBubbles(newBubbles);
 
-      // Timelapse Clock Simulation
+      // Timelapse Clock
       if (isTimelapse) {
         const simMinutes = Math.floor((totalTime * 30) % 720) + 480;
         const h = Math.floor(simMinutes / 60);
@@ -475,7 +440,7 @@ export default function VirtualOffice() {
 
     animate();
 
-    // 10. Resize
+    // 9. Resize Handling
     const handleResize = () => {
       if (!container) return;
       const w = container.clientWidth || window.innerWidth;
@@ -496,208 +461,381 @@ export default function VirtualOffice() {
       renderer.domElement.removeEventListener('pointerdown', handlePointerDown);
       renderer.dispose();
       if (container) container.innerHTML = '';
-      actorObjectsRef.current.clear();
-      deskMeshesRef.current.clear();
+      actorsMapRef.current.clear();
     };
   }, [gaya, isTimelapse]);
 
-  // Build Office Architecture
-  function buildRooms(scene: THREE.Scene, theme: GayaId) {
-    deskMeshesRef.current.clear();
+  // Build Enlarged Architectural Office Layout with Chairs & Procedural Characters
+  function buildEnlargedOffice(scene: THREE.Scene, theme: GayaId) {
+    actorsMapRef.current.clear();
 
     let wallColor = 0x334155;
-    let floorBaseColor = 0x1e293b;
     let deskColor = 0x273549;
+    let chairColor = 0x1e293b;
 
     if (theme === 'hologram') {
       scene.background = new THREE.Color(0x040814);
       wallColor = 0x0284c7;
-      floorBaseColor = 0x071126;
       deskColor = 0x0c2140;
+      chairColor = 0x0369a1;
     } else if (theme === 'clay') {
       scene.background = new THREE.Color(0x2d2b38);
       wallColor = 0xb4a49c;
-      floorBaseColor = 0xdfd3c3;
       deskColor = 0xc7b198;
+      chairColor = 0x8a7968;
     } else if (theme === 'diorama') {
       scene.background = new THREE.Color(0x11161d);
       wallColor = 0x4a3b32;
-      floorBaseColor = 0x221a15;
       deskColor = 0x5a463a;
+      chairColor = 0x2b221c;
     } else {
       scene.background = new THREE.Color(0x0b1120);
     }
 
-    // 1. Multi-Rooms Floor Layout (3 Ruangan Berbeda)
+    // 1. Large Office Floors (20m x 11m)
     RUANGAN_LIST.forEach((room) => {
       const roomWidth = room.x1 - room.x0;
-      const roomGeo = new THREE.PlaneGeometry(roomWidth, 9);
+      const roomGeo = new THREE.PlaneGeometry(roomWidth, 10.5);
       const roomMat = new THREE.MeshStandardMaterial({
-        color: theme === 'hologram' ? 0x081b33 : theme === 'clay' ? room.floorColor + 0x222222 : room.floorColor,
-        roughness: theme === 'clay' ? 0.9 : 0.6,
-        metalness: theme === 'hologram' ? 0.5 : 0.1,
+        color: theme === 'hologram' ? 0x081b33 : room.floorColor,
+        roughness: 0.65,
+        metalness: theme === 'hologram' ? 0.4 : 0.1,
       });
       const roomMesh = new THREE.Mesh(roomGeo, roomMat);
       roomMesh.rotation.x = -Math.PI / 2;
-      roomMesh.position.set((room.x0 + room.x1) / 2, 0.005, -0.4);
+      roomMesh.position.set((room.x0 + room.x1) / 2, 0.005, 0);
       roomMesh.receiveShadow = true;
       scene.add(roomMesh);
 
-      // Carpet for Room Zone
-      const rugGeo = new THREE.PlaneGeometry(roomWidth - 0.6, 7.8);
+      // Large Rug for the department
+      const rugGeo = new THREE.PlaneGeometry(roomWidth - 0.7, 9.2);
       const rugMat = new THREE.MeshStandardMaterial({
         color: theme === 'hologram' ? 0x0369a1 : room.rugColor,
         roughness: 0.8,
         transparent: true,
-        opacity: theme === 'hologram' ? 0.4 : 0.85,
+        opacity: theme === 'hologram' ? 0.35 : 0.85,
       });
       const rug = new THREE.Mesh(rugGeo, rugMat);
       rug.rotation.x = -Math.PI / 2;
-      rug.position.set((room.x0 + room.x1) / 2, 0.015, -0.4);
+      rug.position.set((room.x0 + room.x1) / 2, 0.015, 0);
       rug.receiveShadow = true;
       scene.add(rug);
     });
 
-    // 2. Neon Grid for Hologram Mode
+    // 2. Hologram Wireframe Grid
     if (theme === 'hologram') {
-      const grid = new THREE.GridHelper(16, 32, 0x38bdf8, 0x0284c7);
+      const grid = new THREE.GridHelper(22, 44, 0x38bdf8, 0x0284c7);
       grid.position.y = 0.02;
       scene.add(grid);
     }
 
-    // 3. Back Walls
-    const backWallGeo = new THREE.BoxGeometry(16, 3.2, 0.25);
-    const backWallMat = new THREE.MeshStandardMaterial({
-      color: wallColor,
-      roughness: 0.5,
-      transparent: theme === 'hologram',
-      opacity: theme === 'hologram' ? 0.4 : 1,
-    });
-    const backWall = new THREE.Mesh(backWallGeo, backWallMat);
-    backWall.position.set(0, 1.6, -4.9);
+    // 3. Back Architecture Wall
+    const backWall = new THREE.Mesh(
+      new THREE.BoxGeometry(20, 3.6, 0.3),
+      new THREE.MeshStandardMaterial({
+        color: wallColor,
+        roughness: 0.5,
+        transparent: theme === 'hologram',
+        opacity: theme === 'hologram' ? 0.4 : 1,
+      })
+    );
+    backWall.position.set(0, 1.8, -5.25);
     backWall.receiveShadow = true;
     scene.add(backWall);
 
-    // 4. Mission Board 3D di Dinding Tengah
-    const boardGeo = new THREE.BoxGeometry(4.2, 1.8, 0.1);
-    const boardMat = new THREE.MeshStandardMaterial({
-      color: theme === 'hologram' ? 0x0284c7 : 0xf8fafc,
-      roughness: 0.3,
-      emissive: theme === 'hologram' ? 0x0284c7 : 0x000000,
-      emissiveIntensity: 0.3,
-    });
-    const missionBoard = new THREE.Mesh(boardGeo, boardMat);
-    missionBoard.position.set(0, 1.8, -4.76);
-    missionBoard.userData = { isBoard: true };
-    scene.add(missionBoard);
+    // 4. Large 3D Mission Board on Center Wall
+    const board = new THREE.Mesh(
+      new THREE.BoxGeometry(5.4, 2.0, 0.12),
+      new THREE.MeshStandardMaterial({
+        color: theme === 'hologram' ? 0x0284c7 : 0xf8fafc,
+        roughness: 0.3,
+        emissive: theme === 'hologram' ? 0x0284c7 : 0x000000,
+        emissiveIntensity: 0.3,
+      })
+    );
+    board.position.set(0, 2.0, -5.1);
+    board.userData = { isBoard: true };
+    scene.add(board);
 
     // Sticky Notes on Board
-    const noteColors = [0xef4444, 0x3b82f6, 0x10b981, 0xf59e0b];
-    for (let i = 0; i < 8; i++) {
-      const noteGeo = new THREE.PlaneGeometry(0.38, 0.38);
-      const noteMat = new THREE.MeshBasicMaterial({ color: noteColors[i % noteColors.length] });
-      const note = new THREE.Mesh(noteGeo, noteMat);
-      note.position.set(-1.5 + (i % 4) * 1.0, 2.1 - Math.floor(i / 4) * 0.7, -4.70);
+    const noteColors = [0xef4444, 0x3b82f6, 0x10b981, 0xf59e0b, 0x8b5cf6, 0xec4899];
+    for (let i = 0; i < 10; i++) {
+      const note = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.42, 0.42),
+        new THREE.MeshBasicMaterial({ color: noteColors[i % noteColors.length] })
+      );
+      note.position.set(-2.0 + (i % 5) * 1.0, 2.4 - Math.floor(i / 5) * 0.75, -5.02);
       scene.add(note);
     }
 
-    // 5. Lounge & Pantry Furniture (Front Area)
+    // 5. Grand Meeting Conference Table & Chairs in Center Zone
+    const meetTable = new THREE.Mesh(
+      new THREE.BoxGeometry(3.6, 0.75, 1.4),
+      new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.3 })
+    );
+    meetTable.position.set(0, 0.375, 1.4);
+    meetTable.castShadow = true;
+    meetTable.receiveShadow = true;
+    scene.add(meetTable);
+
+    // Meeting Chairs around table (6 Chairs)
+    const meetChairPositions = [
+      [-1.2, 0, 0.4], [0, 0, 0.4], [1.2, 0, 0.4], // North side
+      [-1.2, 0, 2.4], [0, 0, 2.4], [1.2, 0, 2.4], // South side
+    ];
+    meetChairPositions.forEach(([cx, cy, cz], idx) => {
+      createOfficeChair(scene, cx, cy, cz, idx < 3 ? 0 : Math.PI, chairColor);
+    });
+
+    // 6. Lounge Cafe & Coffee Pantry Bar (Wing Barat & Timur Depan)
     // Coffee Counter
-    const counterGeo = new THREE.BoxGeometry(2.6, 0.85, 0.95);
-    const counterMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.4 });
-    const counter = new THREE.Mesh(counterGeo, counterMat);
-    counter.position.set(-5.2, 0.425, 3.2);
+    const counter = new THREE.Mesh(
+      new THREE.BoxGeometry(3.2, 0.88, 1.0),
+      new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.4 })
+    );
+    counter.position.set(-6.8, 0.44, 3.8);
     counter.castShadow = true;
     counter.receiveShadow = true;
     scene.add(counter);
 
     // Coffee Machine
     const coffeeMachine = new THREE.Mesh(
-      new THREE.BoxGeometry(0.55, 0.55, 0.45),
-      new THREE.MeshStandardMaterial({ color: 0x1e1b4b, metalness: 0.8 })
+      new THREE.BoxGeometry(0.6, 0.6, 0.5),
+      new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.85 })
     );
-    coffeeMachine.position.set(-5.2, 1.15, 3.2);
+    coffeeMachine.position.set(-6.8, 1.18, 3.8);
     coffeeMachine.castShadow = true;
     scene.add(coffeeMachine);
 
-    // Sofa Santai
+    // Bar Stools (2 Kursi Bar)
+    createBarStool(scene, -5.8, 3.8, chairColor);
+    createBarStool(scene, -7.8, 3.8, chairColor);
+
+    // Large Lounge Sofa & Coffee Table (Wing Timur Depan)
     const sofa = new THREE.Mesh(
-      new THREE.BoxGeometry(2.8, 0.7, 1.0),
+      new THREE.BoxGeometry(3.4, 0.72, 1.1),
       new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.7 })
     );
-    sofa.position.set(5.2, 0.35, 3.2);
+    sofa.position.set(6.8, 0.36, 3.8);
     sofa.castShadow = true;
     sofa.receiveShadow = true;
     scene.add(sofa);
 
-    // 6. Desks & Laptops for Each Agent
-    INITIAL_ACTORS.forEach((actor) => {
+    const coffeeTable = new THREE.Mesh(
+      new THREE.BoxGeometry(2.0, 0.4, 0.7),
+      new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5 })
+    );
+    coffeeTable.position.set(6.8, 0.2, 2.6);
+    coffeeTable.castShadow = true;
+    scene.add(coffeeTable);
+
+    // 7. Desks, Chairs, and Procedural Cute Human Characters for each Agent
+    INITIAL_ACTORS.forEach((actor, i) => {
       const [dx, dy, dz] = actor.deskPos;
 
-      const deskGeo = new THREE.BoxGeometry(1.5, 0.74, 0.85);
-      const deskMat = new THREE.MeshStandardMaterial({ color: deskColor, roughness: 0.5 });
-      const desk = new THREE.Mesh(deskGeo, deskMat);
-      desk.position.set(dx, 0.37, dz + (actor.rotationY === 0 ? 0.7 : -0.7));
+      // A. Large Wooden Desk
+      const desk = new THREE.Mesh(
+        new THREE.BoxGeometry(1.6, 0.74, 0.9),
+        new THREE.MeshStandardMaterial({ color: deskColor, roughness: 0.5 })
+      );
+      desk.position.set(dx, 0.37, dz);
       desk.castShadow = true;
       desk.receiveShadow = true;
       desk.userData = { agentId: actor.id };
       scene.add(desk);
-      deskMeshesRef.current.set(actor.id, desk);
 
       // Laptop Base
-      const laptopMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.8 });
-      const laptop = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.02, 0.3), laptopMat);
-      laptop.position.set(dx, 0.75, desk.position.z);
+      const laptop = new THREE.Mesh(
+        new THREE.BoxGeometry(0.44, 0.02, 0.32),
+        new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.8 })
+      );
+      laptop.position.set(dx, 0.75, dz);
       scene.add(laptop);
 
-      // Glowing Screen
-      const screenMat = new THREE.MeshBasicMaterial({ color: actor.color });
-      const screen = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.25, 0.015), screenMat);
-      screen.position.set(dx, 0.87, desk.position.z + (actor.rotationY === 0 ? -0.1 : 0.1));
-      screen.rotation.x = actor.rotationY === 0 ? 0.2 : -0.2;
+      // Laptop Screen Glowing with Agent Color
+      const screen = new THREE.Mesh(
+        new THREE.BoxGeometry(0.42, 0.28, 0.015),
+        new THREE.MeshBasicMaterial({ color: actor.shirtColor })
+      );
+      screen.position.set(dx, 0.89, dz + (actor.rotationY === 0 ? -0.12 : 0.12));
+      screen.rotation.x = actor.rotationY === 0 ? 0.22 : -0.22;
       scene.add(screen);
 
-      // Identification Ring under Chair
-      const ring = new THREE.Mesh(
-        new THREE.RingGeometry(0.38, 0.48, 32),
-        new THREE.MeshBasicMaterial({ color: actor.color, side: THREE.DoubleSide })
-      );
-      ring.rotation.x = -Math.PI / 2;
-      ring.position.set(dx, 0.025, dz);
-      scene.add(ring);
+      // Desk Lamp with soft glow
+      const lampPoint = new THREE.PointLight(actor.shirtColor, 0.8, 2.5);
+      lampPoint.position.set(dx + 0.55, 1.1, dz);
+      scene.add(lampPoint);
+
+      // B. REAL ERGONOMIC OFFICE CHAIR (TEMPAT DUDUK LENGKAP)
+      // Chair position is placed directly behind the desk
+      const chairZ = dz + (actor.rotationY === 0 ? 0.85 : -0.85);
+      const chairGroup = createOfficeChair(scene, dx, 0, chairZ, actor.rotationY, chairColor);
+
+      // C. CUTE PROCEDURAL HUMAN CHARACTER (Stylized Office Worker)
+      const root = new THREE.Group();
+      root.position.set(dx, 0, chairZ);
+      root.userData = { agentId: actor.id };
+
+      // Materials for this character
+      const shirtMat = new THREE.MeshStandardMaterial({ color: actor.shirtColor, roughness: 0.5 });
+      const pantsMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.7 });
+      const skinMat = new THREE.MeshStandardMaterial({ color: actor.skinColor, roughness: 0.6 });
+      const hairMat = new THREE.MeshStandardMaterial({ color: actor.hairColor, roughness: 0.5 });
+
+      // Torso / Body (Capsule/Rounded Box)
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.52, 0.28), shirtMat);
+      body.position.y = 0.95;
+      body.castShadow = true;
+      root.add(body);
+
+      // Head (Sphere)
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 24, 24), skinMat);
+      head.position.y = 1.44;
+      head.castShadow = true;
+      root.add(head);
+
+      // Styled Hair Cap
+      const hair = new THREE.Mesh(new THREE.SphereGeometry(0.23, 16, 16, 0, Math.PI * 2, 0, Math.PI / 1.8), hairMat);
+      hair.position.set(0, 0.04, -0.02);
+      hair.rotation.x = -0.2;
+      head.add(hair);
+
+      // Limbs: Arms
+      const armGeo = new THREE.CylinderGeometry(0.065, 0.065, 0.38, 12);
+      armGeo.translate(0, -0.19, 0); // pivot at shoulder
+
+      const armL = new THREE.Mesh(armGeo, shirtMat);
+      armL.position.set(-0.28, 1.15, 0);
+      root.add(armL);
+
+      const armR = new THREE.Mesh(armGeo, shirtMat);
+      armR.position.set(0.28, 1.15, 0);
+      root.add(armR);
+
+      // Limbs: Legs
+      const legGeo = new THREE.CylinderGeometry(0.08, 0.075, 0.44, 12);
+      legGeo.translate(0, -0.22, 0); // pivot at hip
+
+      const legL = new THREE.Mesh(legGeo, pantsMat);
+      legL.position.set(-0.13, 0.68, 0);
+      root.add(legL);
+
+      const legR = new THREE.Mesh(legGeo, pantsMat);
+      legR.position.set(0.13, 0.68, 0);
+      root.add(legR);
+
+      // Initial sitting pose
+      legL.rotation.x = -Math.PI / 2.2;
+      legR.rotation.x = -Math.PI / 2.2;
+      armL.rotation.x = -Math.PI / 3.2;
+      armR.rotation.x = -Math.PI / 3.2;
+
+      scene.add(root);
+
+      actorsMapRef.current.set(actor.id, {
+        root,
+        body,
+        head,
+        armL,
+        armR,
+        legL,
+        legR,
+        chairGroup,
+        seatPos: new THREE.Vector3(dx, 0, chairZ),
+        currentPos: new THREE.Vector3(dx, 0, chairZ),
+        isWalking: false,
+        deskMesh: desk,
+        laptopLight: lampPoint,
+      });
     });
   }
 
-  // CrossFade animation transition
-  function crossFade(actorData: any, targetAnim: string) {
-    const currentAction = actorData.actions.get(actorData.currentActionName);
-    const newAction = actorData.actions.get(targetAnim);
-    if (!newAction || targetAnim === actorData.currentActionName) return;
+  // Helper: Create Realistic Ergonomic Office Swivel Chair (Tempat Duduk)
+  function createOfficeChair(scene: THREE.Scene, x: number, y: number, z: number, rotY: number, colorHex: number) {
+    const chairGroup = new THREE.Group();
+    chairGroup.position.set(x, y, z);
+    chairGroup.rotation.y = rotY;
 
-    newAction.reset();
-    newAction.setEffectiveTimeScale(1);
-    newAction.setEffectiveWeight(1);
+    const chromeMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.85, roughness: 0.2 });
+    const cushionMat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.7 });
 
-    if (currentAction) {
-      currentAction.crossFadeTo(newAction, 0.3, true);
+    // 1. Star Caster Base (5 Wheels)
+    const baseCyl = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.08, 12), chromeMat);
+    baseCyl.position.y = 0.06;
+    chairGroup.add(baseCyl);
+
+    for (let i = 0; i < 5; i++) {
+      const angle = (i * Math.PI * 2) / 5;
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.03, 0.04), chromeMat);
+      leg.position.set(Math.cos(angle) * 0.18, 0.05, Math.sin(angle) * 0.18);
+      leg.rotation.y = -angle;
+      chairGroup.add(leg);
     }
-    newAction.play();
-    actorData.currentActionName = targetAnim;
+
+    // 2. Gas Lift Center Stem
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.38, 12), chromeMat);
+    stem.position.y = 0.25;
+    chairGroup.add(stem);
+
+    // 3. Ergonomic Padded Seat Cushion
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.09, 0.56), cushionMat);
+    seat.position.y = 0.46;
+    seat.castShadow = true;
+    seat.receiveShadow = true;
+    chairGroup.add(seat);
+
+    // 4. Ergonomic Backrest with Lumbar Support
+    const backrest = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.62, 0.08), cushionMat);
+    backrest.position.set(0, 0.80, 0.26);
+    backrest.rotation.x = -0.08;
+    backrest.castShadow = true;
+    chairGroup.add(backrest);
+
+    // 5. Left & Right Armrests
+    const armL = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.03, 0.32), chromeMat);
+    armL.position.set(-0.31, 0.65, 0.05);
+    chairGroup.add(armL);
+
+    const armR = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.03, 0.32), chromeMat);
+    armR.position.set(0.31, 0.65, 0.05);
+    chairGroup.add(armR);
+
+    scene.add(chairGroup);
+    return chairGroup;
   }
 
-  const triggerActorAnimation = (agentId: string, animName: string) => {
-    const actorData = actorObjectsRef.current.get(agentId);
-    if (!actorData) return;
-    crossFade(actorData, animName);
-  };
+  // Helper: Create Bar Stool
+  function createBarStool(scene: THREE.Scene, x: number, z: number, colorHex: number) {
+    const stool = new THREE.Group();
+    stool.position.set(x, 0, z);
 
+    const chromeMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.8 });
+    const seatMat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.6 });
+
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.02, 24), chromeMat);
+    base.position.y = 0.01;
+    stool.add(base);
+
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.65, 12), chromeMat);
+    stem.position.y = 0.33;
+    stool.add(stem);
+
+    const seat = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.06, 24), seatMat);
+    seat.position.y = 0.66;
+    stool.add(seat);
+
+    scene.add(stool);
+  }
+
+  // Reset Camera View
   const resetCamera = () => {
     if (!controlsRef.current || !cameraRef.current) return;
-    cameraRef.current.position.set(14, 14, 14);
-    controlsRef.current.target.set(0, 0.4, 0);
+    cameraRef.current.position.set(16, 16, 16);
+    controlsRef.current.target.set(0, 0.5, 0);
     controlsRef.current.update();
   };
 
+  // Chat Submission
   const handleSendCommand = (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatInput.trim() || !selectedAgent) return;
@@ -705,16 +843,14 @@ export default function VirtualOffice() {
     const time = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
     const userMsg = { sender: 'Anda (Owner)', text: chatInput, time };
 
-    triggerActorAnimation(selectedAgent.id, 'ThumbsUp');
-
     setTimeout(() => {
       const botReply = {
         sender: selectedAgent.name,
-        text: `🤖 [${selectedAgent.emoji} ${selectedAgent.name}]: Siap! Perintah "${chatInput}" sedang dijalankan.`,
+        text: `🤖 [${selectedAgent.emoji} ${selectedAgent.name}]: Siap! Perintah "${chatInput}" sedang diproses.`,
         time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
       };
       setChatLogs((prev) => [...prev, userMsg, botReply]);
-    }, 1000);
+    }, 800);
 
     setChatLogs((prev) => [...prev, userMsg]);
     setChatInput('');
@@ -726,19 +862,10 @@ export default function VirtualOffice() {
       {/* ─── 3D WEBGL FULL-SCREEN CANVAS ─── */}
       <div ref={mountRef} className="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing z-0" />
 
-      {/* Loading Overlay */}
-      {isLoading && (
-        <div className="absolute inset-0 bg-slate-950 z-50 flex flex-col items-center justify-center space-y-3">
-          <Bot className="w-12 h-12 text-indigo-400 animate-bounce" />
-          <div className="text-base font-bold text-white tracking-wide">Memuat Kantor AI 3D Diorama...</div>
-          <span className="text-xs text-slate-400 font-mono">Three.js &bull; Orthographic Isometric</span>
-        </div>
-      )}
-
       {/* ─── FLOATING TOP-LEFT TITLE & STATUS WIDGET ─── */}
       <div className="absolute top-5 left-6 z-20 flex flex-col gap-1 pointer-events-auto">
-        <div className="flex items-center gap-2.5 bg-slate-900/80 backdrop-blur-xl border border-slate-800/80 px-4 py-2.5 rounded-2xl shadow-2xl">
-          <div className="p-1.5 rounded-xl bg-indigo-500/10 text-indigo-400">
+        <div className="flex items-center gap-3 bg-slate-900/85 backdrop-blur-xl border border-slate-800/80 px-4 py-2.5 rounded-2xl shadow-2xl">
+          <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400">
             <Building2 className="w-5 h-5" />
           </div>
           <div>
@@ -748,11 +875,11 @@ export default function VirtualOffice() {
               </h1>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                Live
+                Full Kantor AI
               </span>
             </div>
             <p className="text-[11px] text-slate-400 font-medium">
-              Autonomous AI Workforce &bull; {actors.length} Agen Mandiri
+              3 Wing Departemen &bull; Kursi Ergonomis &bull; 8 Karakter Manusia
             </p>
           </div>
         </div>
@@ -770,7 +897,7 @@ export default function VirtualOffice() {
         {/* Mission Board Trigger */}
         <button
           onClick={() => setShowMissionBoard(true)}
-          className="px-3.5 py-2 rounded-2xl bg-slate-900/80 backdrop-blur-xl border border-slate-800 text-slate-200 hover:text-white text-xs font-semibold flex items-center gap-1.5 shadow-xl transition-all hover:border-slate-700"
+          className="px-3.5 py-2 rounded-2xl bg-slate-900/85 backdrop-blur-xl border border-slate-800 text-slate-200 hover:text-white text-xs font-semibold flex items-center gap-1.5 shadow-xl transition-all hover:border-slate-700"
         >
           <ClipboardList className="w-4 h-4 text-indigo-400" />
           <span>Mission Board</span>
@@ -782,19 +909,19 @@ export default function VirtualOffice() {
           className={`px-3.5 py-2 rounded-2xl text-xs font-semibold border flex items-center gap-1.5 shadow-xl transition-all ${
             isTimelapse
               ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 animate-pulse'
-              : 'bg-slate-900/80 backdrop-blur-xl text-slate-300 border-slate-800 hover:text-white hover:border-slate-700'
+              : 'bg-slate-900/85 backdrop-blur-xl text-slate-300 border-slate-800 hover:text-white hover:border-slate-700'
           }`}
-          title="Simulasi 1 Hari Kerja Cepat (30 Detik)"
+          title="Simulasi 1 Hari Kerja Cepat"
         >
           {isTimelapse ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
           <span>{isTimelapse ? 'Pause' : 'Timelapse'}</span>
         </button>
 
-        {/* Theme Selector (Pilihan Gaya 3D) */}
+        {/* Theme Selector */}
         <div className="relative">
           <button
             onClick={() => setThemeDropdownOpen(!themeDropdownOpen)}
-            className="px-3.5 py-2 rounded-2xl bg-slate-900/80 backdrop-blur-xl border border-slate-800 text-slate-200 hover:text-white text-xs font-semibold flex items-center gap-1.5 shadow-xl hover:border-slate-700 capitalize"
+            className="px-3.5 py-2 rounded-2xl bg-slate-900/85 backdrop-blur-xl border border-slate-800 text-slate-200 hover:text-white text-xs font-semibold flex items-center gap-1.5 shadow-xl hover:border-slate-700 capitalize"
           >
             <Palette className="w-4 h-4 text-indigo-400" />
             <span>Gaya: {gaya}</span>
@@ -822,13 +949,13 @@ export default function VirtualOffice() {
           )}
         </div>
 
-        {/* Audio Ambient Synthesizer */}
+        {/* Audio Synthesizer */}
         <button
           onClick={toggleAudio}
           className={`p-2.5 rounded-2xl text-xs border shadow-xl transition-all ${
             audioPlaying
               ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-              : 'bg-slate-900/80 backdrop-blur-xl text-slate-400 border-slate-800 hover:text-white hover:border-slate-700'
+              : 'bg-slate-900/85 backdrop-blur-xl text-slate-400 border-slate-800 hover:text-white hover:border-slate-700'
           }`}
           title="Lo-Fi Ambient Music"
         >
@@ -838,7 +965,7 @@ export default function VirtualOffice() {
         {/* Reset Camera */}
         <button
           onClick={resetCamera}
-          className="p-2.5 rounded-2xl bg-slate-900/80 backdrop-blur-xl text-slate-400 hover:text-white border border-slate-800 shadow-xl hover:border-slate-700"
+          className="p-2.5 rounded-2xl bg-slate-900/85 backdrop-blur-xl text-slate-400 hover:text-white border border-slate-800 shadow-xl hover:border-slate-700"
           title="Reset Sudut Kamera"
         >
           <RotateCcw className="w-4 h-4" />
@@ -859,10 +986,7 @@ export default function VirtualOffice() {
             }}
             onClick={() => {
               const actor = INITIAL_ACTORS.find((a) => a.id === b.id);
-              if (actor) {
-                setSelectedAgent(actor);
-                triggerActorAnimation(actor.id, 'Wave');
-              }
+              if (actor) setSelectedAgent(actor);
             }}
             className="transition-all duration-300 z-10 cursor-pointer pointer-events-auto"
           >
@@ -887,9 +1011,9 @@ export default function VirtualOffice() {
         <div className="px-4 py-2 rounded-2xl bg-slate-900/70 backdrop-blur-xl border border-slate-800/80 text-xs text-slate-400 shadow-2xl flex items-center gap-3 font-medium">
           <span>🖱️ <em>Klik karakter untuk berinteraksi</em></span>
           <span>&bull;</span>
-          <span>🔄 <em>Drag untuk putar 3D</em></span>
+          <span>🔄 <em>Drag putar 3D</em></span>
           <span>&bull;</span>
-          <span>🔍 <em>Scroll untuk zoom</em></span>
+          <span>🔍 <em>Scroll zoom</em></span>
         </div>
       </div>
 
@@ -903,7 +1027,7 @@ export default function VirtualOffice() {
               <div className="flex items-center gap-3.5">
                 <div
                   className="w-13 h-13 rounded-2xl flex items-center justify-center text-3xl shadow-xl border border-white/10"
-                  style={{ backgroundColor: selectedAgent.color }}
+                  style={{ backgroundColor: selectedAgent.shirtColor }}
                 >
                   {selectedAgent.emoji}
                 </div>
@@ -953,35 +1077,10 @@ export default function VirtualOffice() {
               )}
             </div>
 
-            {/* 3D Action Triggers */}
-            <div>
-              <label className="text-xs font-semibold text-slate-300 mb-2 block">
-                Gerakan Animasi Karakter 3D:
-              </label>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { key: 'Sitting', label: '🪑 Duduk' },
-                  { key: 'Wave', label: '👋 Sapa' },
-                  { key: 'ThumbsUp', label: '👍 Mantap' },
-                  { key: 'Dance', label: '🕺 Joget' },
-                  { key: 'Jump', label: '🦘 Lompat' },
-                  { key: 'Idle', label: '💤 Standby' },
-                ].map(({ key, label }) => (
-                  <button
-                    key={key}
-                    onClick={() => triggerActorAnimation(selectedAgent.id, key)}
-                    className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 hover:border-indigo-500 hover:bg-slate-800/60 text-xs font-medium text-slate-300 hover:text-white transition-all text-center"
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             {/* Chat WhatsApp Simulator */}
             <div className="space-y-2">
               <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
-                <span>Interaksi WhatsApp Simulator:</span>
+                <span>Kirim Perintah WhatsApp:</span>
                 <span className="text-[10px] text-indigo-400 font-mono">/{selectedAgent.id}</span>
               </label>
 
@@ -1046,7 +1145,6 @@ export default function VirtualOffice() {
                   onClick={() => {
                     setShowMissionBoard(false);
                     setSelectedAgent(actor);
-                    triggerActorAnimation(actor.id, 'Wave');
                   }}
                   className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800/90 hover:border-indigo-500/50 hover:bg-slate-950 transition-all cursor-pointer space-y-1.5"
                 >
