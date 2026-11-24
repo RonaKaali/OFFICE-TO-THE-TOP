@@ -1,6 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { 
   Building2, 
   Volume2, 
@@ -8,14 +12,12 @@ import {
   Sun, 
   Moon, 
   Coffee, 
-  Sparkles, 
-  UserCheck, 
   Send, 
-  Activity, 
   Bot, 
-  Layers, 
-  Info,
-  Maximize2
+  Sparkles,
+  Play,
+  RotateCcw,
+  Eye
 } from 'lucide-react';
 
 export interface AgentCharacter {
@@ -24,40 +26,67 @@ export interface AgentCharacter {
   role: string;
   emoji: string;
   color: string;
-  status: 'idle' | 'working' | 'coffee' | 'meeting';
-  desk: { x: number; y: number; floor?: number };
+  defaultAnim: string;
+  currentAnim: string;
+  deskPos: [number, number, number]; // x, y, z
+  rotationY: number;
   triggers: string[];
   currentTask?: string;
-  avatarSeed: number;
+  modelType: 'robot' | 'human';
 }
 
-const DEFAULT_AGENTS: AgentCharacter[] = [
-  { id: 'produk', name: 'Mbak Rina (Produk)', role: 'Katalog & Stok UMKM', emoji: '📦', color: '#10b981', status: 'working', desk: { x: 160, y: 160 }, triggers: ['produk', 'katalog', 'harga'], currentTask: 'Update harga beras 5kg', avatarSeed: 1 },
-  { id: 'pesanan', name: 'Mas Budi (Pesanan)', role: 'Order WA & Checkout', emoji: '🛒', color: '#3b82f6', status: 'working', desk: { x: 280, y: 160 }, triggers: ['pesan', 'order', 'beli'], currentTask: 'Memproses invoice #WA-904', avatarSeed: 2 },
-  { id: 'absensi', name: 'Siti (HR & Absensi)', role: 'Selfie & Shift Karyawan', emoji: '📸', color: '#8b5cf6', status: 'idle', desk: { x: 400, y: 160 }, triggers: ['absen', 'hadir'], currentTask: 'Rekap shift pagi', avatarSeed: 3 },
-  { id: 'antrian', name: 'Doni (Antrian)', role: 'Nomor Tiket & Antrian Toko', emoji: '🎫', color: '#f59e0b', status: 'coffee', desk: { x: 520, y: 160 }, triggers: ['antrian', 'panggil'], currentTask: 'Istirahat kopi sebentar', avatarSeed: 4 },
-  { id: 'keuangan', name: 'Pak Hendra (Keuangan)', role: 'Rekap Kas, Omset & Laba', emoji: '💰', color: '#ef4444', status: 'working', desk: { x: 160, y: 280 }, triggers: ['omset', 'kas', 'laba'], currentTask: 'Hitung laba harian', avatarSeed: 5 },
-  { id: 'konten', name: 'Jessica (Konten)', role: 'Caption IG & Ide TikTok', emoji: '✍️', color: '#ec4899', status: 'working', desk: { x: 280, y: 280 }, triggers: ['caption', 'ide', 'post'], currentTask: 'Draft konten promo gajian', avatarSeed: 6 },
-  { id: 'support', name: 'Arief (CS Support)', role: 'Auto-balas FAQ 24/7', emoji: '🤝', color: '#06b6d4', status: 'idle', desk: { x: 400, y: 280 }, triggers: ['bantuan', 'faq', 'tanya'], currentTask: 'Standby pesan masuk', avatarSeed: 7 },
-  { id: 'echo', name: 'Echo Bot (QA)', role: 'System Health & Ping', emoji: '🦜', color: '#6b7280', status: 'idle', desk: { x: 520, y: 280 }, triggers: ['echo', 'ping'], currentTask: 'Monitor gateway', avatarSeed: 8 },
+const ROBOT_ANIMATIONS = [
+  'Dance', 'Death', 'Idle', 'Jump', 'No', 'Punch', 
+  'Running', 'Sitting', 'Standing', 'ThumbsUp', 
+  'Walking', 'WalkJump', 'Wave', 'Yes'
+];
+
+const INITIAL_AGENTS: AgentCharacter[] = [
+  { id: 'produk', name: 'Mbak Rina (Produk)', role: 'Katalog & Stok UMKM', emoji: '📦', color: '#10b981', defaultAnim: 'Sitting', currentAnim: 'Sitting', deskPos: [-4, 0, -3], rotationY: 0, triggers: ['produk', 'katalog', 'harga'], currentTask: 'Audit stok beras 5kg', modelType: 'robot' },
+  { id: 'pesanan', name: 'Mas Budi (Pesanan)', role: 'Order WA & Checkout', emoji: '🛒', color: '#3b82f6', defaultAnim: 'ThumbsUp', currentAnim: 'ThumbsUp', deskPos: [-1.5, 0, -3], rotationY: 0, triggers: ['pesan', 'order', 'beli'], currentTask: 'Invoice pesanan #WA-881', modelType: 'robot' },
+  { id: 'absensi', name: 'Siti (HR & Absensi)', role: 'Selfie & Shift Karyawan', emoji: '📸', color: '#8b5cf6', defaultAnim: 'Sitting', currentAnim: 'Sitting', deskPos: [1.5, 0, -3], rotationY: 0, triggers: ['absen', 'hadir'], currentTask: 'Verifikasi selfie masuk', modelType: 'robot' },
+  { id: 'antrian', name: 'Doni (Antrian)', role: 'Nomor Tiket & Antrian Toko', emoji: '🎫', color: '#f59e0b', defaultAnim: 'Wave', currentAnim: 'Wave', deskPos: [4, 0, -3], rotationY: 0, triggers: ['antrian', 'panggil'], currentTask: 'Panggil antrian #A-14', modelType: 'robot' },
+  { id: 'keuangan', name: 'Pak Hendra (Keuangan)', role: 'Rekap Kas & Omset Harian', emoji: '💰', color: '#ef4444', defaultAnim: 'Sitting', currentAnim: 'Sitting', deskPos: [-4, 0, 1.5], rotationY: Math.PI, triggers: ['omset', 'kas', 'laba'], currentTask: 'Rekap omset harian UMKM', modelType: 'robot' },
+  { id: 'konten', name: 'Jessica (Konten)', role: 'Caption IG & Ide TikTok', emoji: '✍️', color: '#ec4899', defaultAnim: 'Dance', currentAnim: 'Dance', deskPos: [-1.5, 0, 1.5], rotationY: Math.PI, triggers: ['caption', 'ide', 'post'], currentTask: 'Bikin ide reels promo', modelType: 'robot' },
+  { id: 'support', name: 'Arief (CS Support)', role: 'Auto-balas FAQ 24/7', emoji: '🤝', color: '#06b6d4', defaultAnim: 'Sitting', currentAnim: 'Sitting', deskPos: [1.5, 0, 1.5], rotationY: Math.PI, triggers: ['bantuan', 'faq', 'tanya'], currentTask: 'Standby pesan WhatsApp', modelType: 'robot' },
+  { id: 'echo', name: 'Echo Bot (QA)', role: 'System Health & Ping', emoji: '🦜', color: '#6b7280', defaultAnim: 'Yes', currentAnim: 'Yes', deskPos: [4, 0, 1.5], rotationY: Math.PI, triggers: ['echo', 'ping'], currentTask: 'Gateway health: OK', modelType: 'robot' },
 ];
 
 export default function VirtualOffice() {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [agents, setAgents] = useState<AgentCharacter[]>(DEFAULT_AGENTS);
-  const [selectedAgent, setSelectedAgent] = useState<AgentCharacter | null>(null);
-  const [activeFloor, setActiveFloor] = useState<'all' | 'workspace' | 'lounge' | 'meeting'>('all');
+  const mountRef = useRef<HTMLDivElement | null>(null);
+  const [agents, setAgents] = useState<AgentCharacter[]>(INITIAL_AGENTS);
+  const [selectedAgent, setSelectedAgent] = useState<AgentCharacter | null>(INITIAL_AGENTS[0]);
   const [timeOfDay, setTimeOfDay] = useState<'day' | 'evening' | 'night'>('day');
   const [audioPlaying, setAudioPlaying] = useState<boolean>(false);
+  const [loadingProgress, setLoadingProgress] = useState<number>(0);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [availableAnimations, setAvailableAnimations] = useState<string[]>(ROBOT_ANIMATIONS);
+  
+  // Interactive Chat State
   const [simulatedChat, setSimulatedChat] = useState('');
   const [chatLog, setChatLog] = useState<{ sender: string; text: string; time: string }[]>([
-    { sender: 'System', text: 'Kantor Virtual OFFICE TO THE TOP aktif.', time: '11:00' },
-    { sender: 'Mbak Rina (Produk)', text: 'Katalog siap disinkronkan ke WhatsApp.', time: '11:02' },
+    { sender: 'System', text: 'Kantor Virtual 3D OFFICE TO THE TOP aktif.', time: '12:00' },
+    { sender: 'Mbak Rina (Produk)', text: 'Katalog siap disinkronkan ke WhatsApp.', time: '12:01' },
   ]);
 
-  // Audio Context Ref for synthetic Web Audio lofi music (72 BPM) like Kantor Kita
+  // Audio Context Ref for synthetic Web Audio lofi music (72 BPM)
   const audioCtxRef = useRef<AudioContext | null>(null);
   const audioIntervalRef = useRef<any>(null);
+
+  // References to Three.js elements
+  const sceneRef = useRef<THREE.Scene | null>(null);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const controlsRef = useRef<OrbitControls | null>(null);
+  const dirLightRef = useRef<THREE.DirectionalLight | null>(null);
+  const hemiLightRef = useRef<THREE.HemisphereLight | null>(null);
+
+  // Mixers map: agentId -> { mixer, actions: Record<string, THREE.AnimationAction>, currentAction }
+  const agentMixersRef = useRef<Map<string, {
+    mixer: THREE.AnimationMixer;
+    actions: Map<string, THREE.AnimationAction>;
+    currentActionName: string;
+    modelGroup: THREE.Group;
+  }>>(new Map());
 
   // Toggle Lo-Fi Ambient Synthesizer
   const toggleAudio = () => {
@@ -67,7 +96,6 @@ export default function VirtualOffice() {
         const ctx = new AudioCtx();
         audioCtxRef.current = ctx;
 
-        // Pentatonic chill chords
         const notes = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25];
         let step = 0;
 
@@ -82,7 +110,7 @@ export default function VirtualOffice() {
           osc.type = 'sine';
           osc.frequency.setValueAtTime(freq, audioCtxRef.current.currentTime);
 
-          gain.gain.setValueAtTime(0.04, audioCtxRef.current.currentTime);
+          gain.gain.setValueAtTime(0.035, audioCtxRef.current.currentTime);
           gain.gain.exponentialRampToValueAtTime(0.0001, audioCtxRef.current.currentTime + 1.2);
 
           osc.connect(gain);
@@ -111,240 +139,369 @@ export default function VirtualOffice() {
     };
   }, []);
 
-  // Canvas 2.5D Isometric Rendering Loop
+  // Update Three.js lighting based on TimeOfDay
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!sceneRef.current || !dirLightRef.current || !hemiLightRef.current) return;
 
-    let animationFrameId: number;
-    let tick = 0;
+    if (timeOfDay === 'day') {
+      sceneRef.current.background = new THREE.Color(0x0f172a);
+      sceneRef.current.fog = new THREE.FogExp2(0x0f172a, 0.025);
+      hemiLightRef.current.color.setHex(0xffffff);
+      hemiLightRef.current.groundColor.setHex(0x444444);
+      hemiLightRef.current.intensity = 1.6;
+      dirLightRef.current.color.setHex(0xfff5e6);
+      dirLightRef.current.intensity = 2.2;
+    } else if (timeOfDay === 'evening') {
+      sceneRef.current.background = new THREE.Color(0x1c1326);
+      sceneRef.current.fog = new THREE.FogExp2(0x1c1326, 0.025);
+      hemiLightRef.current.color.setHex(0xfb923c);
+      hemiLightRef.current.groundColor.setHex(0x27173a);
+      hemiLightRef.current.intensity = 1.3;
+      dirLightRef.current.color.setHex(0xff7733);
+      dirLightRef.current.intensity = 2.0;
+    } else {
+      sceneRef.current.background = new THREE.Color(0x070a13);
+      sceneRef.current.fog = new THREE.FogExp2(0x070a13, 0.03);
+      hemiLightRef.current.color.setHex(0x38bdf8);
+      hemiLightRef.current.groundColor.setHex(0x0b0f19);
+      hemiLightRef.current.intensity = 0.8;
+      dirLightRef.current.color.setHex(0x60a5fa);
+      dirLightRef.current.intensity = 1.2;
+    }
+  }, [timeOfDay]);
 
-    const render = () => {
-      tick++;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+  // Main Three.js Scene Setup & Model Loading
+  useEffect(() => {
+    const container = mountRef.current;
+    if (!container) return;
 
-      // Background ambient lighting
-      if (timeOfDay === 'day') {
-        ctx.fillStyle = '#0f172a'; // Deep slate
-      } else if (timeOfDay === 'evening') {
-        ctx.fillStyle = '#1c1326'; // Sunset warm tint
-      } else {
-        ctx.fillStyle = '#070a13'; // Night cozy office
-      }
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // 1. Scene, Camera, Renderer
+    const width = container.clientWidth || 760;
+    const height = 500;
 
-      // Draw Office Grid & Room Boundaries
-      // Floor Base
-      const floorGrad = ctx.createLinearGradient(0, 50, 0, 550);
-      floorGrad.addColorStop(0, timeOfDay === 'night' ? '#111827' : '#1e293b');
-      floorGrad.addColorStop(1, timeOfDay === 'night' ? '#0b0f17' : '#0f172a');
-      ctx.fillStyle = floorGrad;
-      ctx.roundRect(40, 40, canvas.width - 80, canvas.height - 80, 16);
-      ctx.fill();
-      ctx.strokeStyle = '#334155';
-      ctx.lineWidth = 2;
-      ctx.stroke();
+    const scene = new THREE.Scene();
+    sceneRef.current = scene;
+    scene.background = new THREE.Color(0x0f172a);
+    scene.fog = new THREE.FogExp2(0x0f172a, 0.025);
 
-      // Floor Parquet Texture / Tiles
-      ctx.strokeStyle = 'rgba(51, 65, 85, 0.4)';
-      ctx.lineWidth = 1;
-      for (let x = 60; x < canvas.width - 60; x += 40) {
-        ctx.beginPath();
-        ctx.moveTo(x, 40);
-        ctx.lineTo(x, canvas.height - 40);
-        ctx.stroke();
-      }
-      for (let y = 60; y < canvas.height - 60; y += 40) {
-        ctx.beginPath();
-        ctx.moveTo(40, y);
-        ctx.lineTo(canvas.width - 40, y);
-        ctx.stroke();
-      }
+    const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 100);
+    cameraRef.current = camera;
+    camera.position.set(0, 11, 14);
 
-      // ─── ROOM 1: LOUNGE & PANTRY (Kiri Bawah) ───
-      ctx.fillStyle = 'rgba(30, 41, 59, 0.6)';
-      ctx.fillRect(60, 380, 260, 140);
-      ctx.strokeStyle = '#475569';
-      ctx.strokeRect(60, 380, 260, 140);
-      
-      // Sofa
-      ctx.fillStyle = '#334155';
-      ctx.roundRect(80, 440, 120, 40, 8);
-      ctx.fill();
-      ctx.fillStyle = '#64748b';
-      ctx.fillText('🛋️ Sofa Santai', 100, 465);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+    renderer.setSize(width, height);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    container.innerHTML = '';
+    container.appendChild(renderer.domElement);
 
-      // Coffee Bar / Pantry
-      ctx.fillStyle = '#475569';
-      ctx.fillRect(220, 400, 80, 40);
-      ctx.fillStyle = '#f8fafc';
-      ctx.font = '11px sans-serif';
-      ctx.fillText('☕ Pantry', 235, 425);
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controlsRef.current = controls;
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.maxPolarAngle = Math.PI / 2 - 0.05; // Don't go below floor
+    controls.minDistance = 4;
+    controls.maxDistance = 24;
+    controls.target.set(0, 1, -0.5);
 
-      // Office Cat "Moka" sleeping/wiggling tail
-      const catTail = Math.sin(tick * 0.05) * 4;
-      ctx.font = '18px sans-serif';
-      ctx.fillText('🐈', 180 + catTail, 450);
-      ctx.font = '10px sans-serif';
-      ctx.fillStyle = '#fbbf24';
-      ctx.fillText('Moka (Cat)', 165, 470);
+    // 2. Lights
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.6);
+    hemiLight.position.set(0, 20, 0);
+    scene.add(hemiLight);
+    hemiLightRef.current = hemiLight;
 
-      // ─── ROOM 2: GLASS MEETING ROOM (Kanan Bawah) ───
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
-      ctx.fillRect(360, 380, 320, 140);
-      ctx.strokeStyle = '#38bdf8';
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(360, 380, 320, 140);
+    const dirLight = new THREE.DirectionalLight(0xfff5e6, 2.2);
+    dirLight.position.set(10, 18, 12);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.width = 1024;
+    dirLight.shadow.mapSize.height = 1024;
+    dirLight.shadow.camera.near = 0.5;
+    dirLight.shadow.camera.far = 40;
+    dirLight.shadow.camera.left = -12;
+    dirLight.shadow.camera.right = 12;
+    dirLight.shadow.camera.top = 12;
+    dirLight.shadow.camera.bottom = -12;
+    dirLight.shadow.bias = -0.0005;
+    scene.add(dirLight);
+    dirLightRef.current = dirLight;
 
-      // Glass Meeting Table
-      ctx.fillStyle = '#1e293b';
-      ctx.roundRect(420, 410, 200, 60, 12);
-      ctx.fill();
-      ctx.strokeStyle = '#0284c7';
-      ctx.stroke();
-      ctx.fillStyle = '#38bdf8';
-      ctx.font = 'bold 11px sans-serif';
-      ctx.fillText('📊 Ruang Rapat & Whiteboard UMKM', 440, 445);
+    // 3. Environment: Floor & Desks
+    // Main Parquet Floor
+    const floorGeo = new THREE.PlaneGeometry(16, 12);
+    const floorMat = new THREE.MeshStandardMaterial({
+      color: 0x1e293b,
+      roughness: 0.65,
+      metalness: 0.1,
+    });
+    const floor = new THREE.Mesh(floorGeo, floorMat);
+    floor.rotation.x = -Math.PI / 2;
+    floor.receiveShadow = true;
+    scene.add(floor);
 
-      // Potted Plants in Corner
-      ctx.font = '20px sans-serif';
-      ctx.fillText('🪴', 60, 70);
-      ctx.fillText('🪴', canvas.width - 80, 70);
-      ctx.fillText('🪴', canvas.width - 80, canvas.height - 60);
+    // Grid Overlay
+    const grid = new THREE.GridHelper(16, 16, 0x475569, 0x334155);
+    grid.position.y = 0.01;
+    scene.add(grid);
 
-      // ─── AGENT DESKS & CHARACTERS ───
-      agents.forEach((agent) => {
-        const { x, y } = agent.desk;
+    // Lounge Area Mat
+    const loungeMatGeo = new THREE.PlaneGeometry(5, 4);
+    const loungeMatMesh = new THREE.Mesh(loungeMatGeo, new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.8 }));
+    loungeMatMesh.rotation.x = -Math.PI / 2;
+    loungeMatMesh.position.set(-5, 0.02, 3.5);
+    loungeMatMesh.receiveShadow = true;
+    scene.add(loungeMatMesh);
 
-        // Desk Shadow
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-        ctx.beginPath();
-        ctx.ellipse(x + 25, y + 45, 35, 12, 0, 0, Math.PI * 2);
-        ctx.fill();
+    // Sofa
+    const sofaGeo = new THREE.BoxGeometry(2.5, 0.6, 0.9);
+    const sofaMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.7 });
+    const sofa = new THREE.Mesh(sofaGeo, sofaMat);
+    sofa.position.set(-5, 0.3, 4.2);
+    sofa.castShadow = true;
+    sofa.receiveShadow = true;
+    scene.add(sofa);
 
-        // Wooden Desk
-        ctx.fillStyle = '#334155';
-        ctx.roundRect(x - 20, y, 90, 45, 6);
-        ctx.fill();
-        ctx.strokeStyle = '#475569';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
+    // Glass Meeting Room Wall & Table
+    const glassMat = new THREE.MeshPhysicalMaterial({
+      color: 0x38bdf8,
+      transparent: true,
+      opacity: 0.25,
+      roughness: 0.1,
+      transmission: 0.9,
+      thickness: 0.5,
+    });
+    const wallGeo = new THREE.BoxGeometry(0.1, 2.5, 4.5);
+    const wall = new THREE.Mesh(wallGeo, glassMat);
+    wall.position.set(4.5, 1.25, 3.5);
+    scene.add(wall);
 
-        // Laptop / Monitor
-        const screenGlow = Math.sin(tick * 0.08) * 0.2 + 0.8;
-        ctx.fillStyle = agent.status === 'working' ? `rgba(96, 165, 250, ${screenGlow})` : '#475569';
-        ctx.fillRect(x + 15, y + 8, 22, 14);
-        ctx.fillStyle = '#0f172a';
-        ctx.fillRect(x + 13, y + 22, 26, 3); // keyboard
+    const meetTableGeo = new THREE.CylinderGeometry(1.4, 1.4, 0.75, 24);
+    const meetTableMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4 });
+    const meetTable = new THREE.Mesh(meetTableGeo, meetTableMat);
+    meetTable.position.set(6, 0.375, 3.5);
+    meetTable.castShadow = true;
+    meetTable.receiveShadow = true;
+    scene.add(meetTable);
 
-        // Character Avatar (Chibi / Soft-block style)
-        // Body animation (subtle typing breathing movement)
-        const typingOffset = agent.status === 'working' ? Math.sin(tick * 0.3 + agent.avatarSeed) * 2 : 0;
-        const charY = y - 10 + typingOffset;
+    // Create 8 Desks + Laptops + Identification Plates
+    INITIAL_AGENTS.forEach((agent) => {
+      const [dx, dy, dz] = agent.deskPos;
 
-        // Body
-        ctx.fillStyle = agent.color;
-        ctx.roundRect(x + 14, charY, 24, 20, 6);
-        ctx.fill();
+      // Wooden Desk
+      const deskGeo = new THREE.BoxGeometry(1.6, 0.75, 0.9);
+      const deskMat = new THREE.MeshStandardMaterial({ color: 0x273549, roughness: 0.5 });
+      const desk = new THREE.Mesh(deskGeo, deskMat);
+      desk.position.set(dx, 0.375, dz + (agent.rotationY === 0 ? 0.7 : -0.7));
+      desk.castShadow = true;
+      desk.receiveShadow = true;
+      scene.add(desk);
 
-        // Head
-        ctx.fillStyle = '#fed7aa'; // warm peach skin tone
-        ctx.beginPath();
-        ctx.arc(x + 26, charY - 8, 11, 0, Math.PI * 2);
-        ctx.fill();
+      // Laptop base & screen
+      const laptopMat = new THREE.MeshStandardMaterial({ color: 0x1e1b4b, metalness: 0.7, roughness: 0.2 });
+      const laptopBase = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.03, 0.3), laptopMat);
+      laptopBase.position.set(dx, 0.76, desk.position.z);
+      scene.add(laptopBase);
 
-        // Hair / Cap
-        ctx.fillStyle = agent.avatarSeed % 2 === 0 ? '#451a03' : '#1e1b4b';
-        ctx.beginPath();
-        ctx.arc(x + 26, charY - 12, 11, Math.PI, Math.PI * 2);
-        ctx.fill();
+      // Laptop glowing screen
+      const screenMat = new THREE.MeshBasicMaterial({ color: agent.color });
+      const screenMesh = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.25, 0.02), screenMat);
+      screenMesh.position.set(dx, 0.88, desk.position.z + (agent.rotationY === 0 ? -0.12 : 0.12));
+      screenMesh.rotation.x = agent.rotationY === 0 ? 0.2 : -0.2;
+      scene.add(screenMesh);
 
-        // Hands typing on keyboard
-        if (agent.status === 'working') {
-          ctx.fillStyle = '#fed7aa';
-          ctx.beginPath();
-          ctx.arc(x + 19 + Math.sin(tick * 0.5) * 2, y + 18, 3, 0, Math.PI * 2);
-          ctx.arc(x + 33 - Math.sin(tick * 0.5) * 2, y + 18, 3, 0, Math.PI * 2);
-          ctx.fill();
-        }
-
-        // Status Bubble above head
-        if (agent.status === 'working') {
-          ctx.fillStyle = '#38bdf8';
-          ctx.font = '10px sans-serif';
-          ctx.fillText('⚡ Typing...', x + 8, charY - 24);
-        } else if (agent.status === 'coffee') {
-          ctx.fillStyle = '#f59e0b';
-          ctx.font = '10px sans-serif';
-          ctx.fillText('☕ Break', x + 12, charY - 24);
-        } else {
-          ctx.fillStyle = '#10b981';
-          ctx.font = '10px sans-serif';
-          ctx.fillText('💤 Idle', x + 16, charY - 24);
-        }
-
-        // Agent Name Tag below desk
-        ctx.fillStyle = '#f8fafc';
-        ctx.font = 'bold 11px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(`${agent.emoji} ${agent.name.split(' ')[0]}`, x + 25, y + 62);
-        ctx.textAlign = 'start';
-
-        // Selection highlight ring
-        if (selectedAgent?.id === agent.id) {
-          ctx.strokeStyle = '#a855f7';
-          ctx.lineWidth = 2.5;
-          ctx.setLineDash([4, 4]);
-          ctx.strokeRect(x - 25, charY - 35, 100, 105);
-          ctx.setLineDash([]);
-        }
-      });
-
-      // Lighting Warmth Filter
-      if (timeOfDay === 'evening') {
-        ctx.fillStyle = 'rgba(251, 146, 60, 0.08)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      } else if (timeOfDay === 'night') {
-        ctx.fillStyle = 'rgba(15, 23, 42, 0.25)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      }
-
-      animationFrameId = requestAnimationFrame(render);
-    };
-
-    render();
-
-    return () => {
-      cancelAnimationFrame(animationFrameId);
-    };
-  }, [agents, selectedAgent, timeOfDay]);
-
-  // Click handler to select character
-  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const clickX = ((e.clientX - rect.left) / rect.width) * canvas.width;
-    const clickY = ((e.clientY - rect.top) / rect.height) * canvas.height;
-
-    // Check hit test for each agent
-    const clicked = agents.find((ag) => {
-      return (
-        clickX >= ag.desk.x - 30 &&
-        clickX <= ag.desk.x + 80 &&
-        clickY >= ag.desk.y - 40 &&
-        clickY <= ag.desk.y + 70
-      );
+      // Color Identification Pedestal / Ring under Character
+      const ringGeo = new THREE.RingGeometry(0.35, 0.45, 32);
+      const ringMat = new THREE.MeshBasicMaterial({ color: agent.color, side: THREE.DoubleSide });
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(dx, 0.02, dz);
+      scene.add(ring);
     });
 
-    if (clicked) {
-      setSelectedAgent(clicked);
+    // 4. Load GLB Model with GLTFLoader & AnimationMixer
+    const loader = new GLTFLoader();
+    setIsLoading(true);
+
+    loader.load(
+      '/models/robot.glb',
+      (gltf) => {
+        setIsLoading(false);
+        const originalScene = gltf.scene;
+        const animations = gltf.animations;
+
+        // Extract and store available animation names
+        const animNames = animations.map((a) => a.name);
+        setAvailableAnimations(animNames);
+
+        // Instantiate and place each character with its own AnimationMixer
+        INITIAL_AGENTS.forEach((agent) => {
+          // Clone the rigged model with SkeletonUtils
+          const clone = SkeletonUtils.clone(originalScene) as THREE.Group;
+          clone.scale.set(0.42, 0.42, 0.42);
+          clone.position.set(agent.deskPos[0], agent.deskPos[1], agent.deskPos[2]);
+          clone.rotation.y = agent.rotationY;
+
+          // Enable shadows and add agent metadata
+          clone.traverse((child: any) => {
+            if (child.isMesh) {
+              child.castShadow = true;
+              child.receiveShadow = true;
+              child.userData = { agentId: agent.id };
+            }
+          });
+
+          scene.add(clone);
+
+          // Create independent AnimationMixer for this agent
+          const mixer = new THREE.AnimationMixer(clone);
+          const actionsMap = new Map<string, THREE.AnimationAction>();
+
+          animations.forEach((clip) => {
+            const action = mixer.clipAction(clip);
+            actionsMap.set(clip.name, action);
+          });
+
+          // Play default animation
+          const initialAnim = actionsMap.get(agent.defaultAnim) || actionsMap.get('Sitting') || actionsMap.get('Idle');
+          if (initialAnim) {
+            initialAnim.play();
+          }
+
+          agentMixersRef.current.set(agent.id, {
+            mixer,
+            actions: actionsMap,
+            currentActionName: agent.defaultAnim,
+            modelGroup: clone,
+          });
+        });
+      },
+      (xhr) => {
+        if (xhr.total > 0) {
+          setLoadingProgress(Math.round((xhr.loaded / xhr.total) * 100));
+        }
+      },
+      (error) => {
+        console.error('Error loading GLTF model:', error);
+        setIsLoading(false);
+      }
+    );
+
+    // 5. Raycasting for Mouse Selection
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    const handlePointerDown = (event: MouseEvent) => {
+      const rect = renderer.domElement.getBoundingClientRect();
+      mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(scene.children, true);
+
+      for (const hit of intersects) {
+        let currentObj: any = hit.object;
+        while (currentObj && currentObj !== scene) {
+          if (currentObj.userData && currentObj.userData.agentId) {
+            const foundAgent = INITIAL_AGENTS.find((a) => a.id === currentObj.userData.agentId);
+            if (foundAgent) {
+              setSelectedAgent(foundAgent);
+              // Trigger Wave or ThumbsUp on click
+              triggerAgentAnimation(foundAgent.id, 'Wave');
+              return;
+            }
+          }
+          currentObj = currentObj.parent;
+        }
+      }
+    };
+
+    renderer.domElement.addEventListener('pointerdown', handlePointerDown);
+
+    // 6. Animation Render Loop with delta time
+    const clock = new THREE.Clock();
+    let animId: number;
+
+    const animate = () => {
+      animId = requestAnimationFrame(animate);
+      const delta = clock.getDelta();
+
+      // Update all agent AnimationMixers
+      agentMixersRef.current.forEach(({ mixer }) => {
+        mixer.update(delta);
+      });
+
+      controls.update();
+      renderer.render(scene, camera);
+    };
+
+    animate();
+
+    // 7. Window Resize Handler
+    const handleResize = () => {
+      if (!container) return;
+      const w = container.clientWidth || 760;
+      camera.aspect = w / height;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, height);
+    };
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      cancelAnimationFrame(animId);
+      window.removeEventListener('resize', handleResize);
+      renderer.domElement.removeEventListener('pointerdown', handlePointerDown);
+      renderer.dispose();
+      if (container) container.innerHTML = '';
+      agentMixersRef.current.clear();
+    };
+  }, []);
+
+  // Function to smoothly switch animation using crossFadeTo
+  const triggerAgentAnimation = (agentId: string, targetAnim: string) => {
+    const entry = agentMixersRef.current.get(agentId);
+    if (!entry) return;
+
+    const { actions, currentActionName } = entry;
+    const currentAction = actions.get(currentActionName);
+    const newAction = actions.get(targetAnim);
+
+    if (!newAction || targetAnim === currentActionName) return;
+
+    newAction.reset();
+    newAction.setEffectiveTimeScale(1);
+    newAction.setEffectiveWeight(1);
+
+    if (currentAction) {
+      currentAction.crossFadeTo(newAction, 0.35, true);
     }
+    newAction.play();
+
+    entry.currentActionName = targetAnim;
+
+    setAgents((prev) =>
+      prev.map((a) => (a.id === agentId ? { ...a, currentAnim: targetAnim } : a))
+    );
   };
 
-  // Simulate command interaction
+  // Focus Camera on Selected Character
+  const focusOnAgent = (agent: AgentCharacter) => {
+    setSelectedAgent(agent);
+    if (!controlsRef.current || !cameraRef.current) return;
+    const [x, y, z] = agent.deskPos;
+    controlsRef.current.target.set(x, y + 0.5, z);
+    cameraRef.current.position.set(x + 2, y + 2.5, z + 3);
+    controlsRef.current.update();
+  };
+
+  // Reset Camera View
+  const resetCamera = () => {
+    if (!controlsRef.current || !cameraRef.current) return;
+    controlsRef.current.target.set(0, 1, -0.5);
+    cameraRef.current.position.set(0, 11, 14);
+    controlsRef.current.update();
+  };
+
+  // Handle Command in Console
   const handleSendCommand = (e: React.FormEvent) => {
     e.preventDefault();
     if (!simulatedChat.trim() || !selectedAgent) return;
@@ -352,27 +509,17 @@ export default function VirtualOffice() {
     const time = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
     const userMsg = { sender: 'Anda (Owner)', text: simulatedChat, time };
 
-    // Update status to working
-    setAgents((prev) =>
-      prev.map((a) =>
-        a.id === selectedAgent.id ? { ...a, status: 'working', currentTask: simulatedChat } : a
-      )
-    );
+    // Trigger positive animation on the agent (ThumbsUp / Yes / Dance)
+    triggerAgentAnimation(selectedAgent.id, 'ThumbsUp');
 
-    // Bot response simulation
     setTimeout(() => {
       const botReply = {
         sender: selectedAgent.name,
-        text: `🤖 [${selectedAgent.emoji} ${selectedAgent.name}]: Perintah "${simulatedChat}" diterima & diproses!`,
+        text: `🤖 [${selectedAgent.emoji} ${selectedAgent.name}]: Perintah "${simulatedChat}" diterima & berhasil dieksekusi!`,
         time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
       };
       setChatLog((logs) => [...logs, userMsg, botReply]);
-      setAgents((prev) =>
-        prev.map((a) =>
-          a.id === selectedAgent.id ? { ...a, status: 'idle' } : a
-        )
-      );
-    }, 1200);
+    }, 1000);
 
     setChatLog((logs) => [...logs, userMsg]);
     setSimulatedChat('');
@@ -383,26 +530,36 @@ export default function VirtualOffice() {
       {/* Top Office Toolbar */}
       <div className="p-4 sm:p-5 border-b border-slate-800 bg-slate-950/70 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
+          <div className="p-2.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
             <Building2 className="w-6 h-6" />
           </div>
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-bold text-white tracking-tight">
-                Kantor AI — Virtual 3D Office Diorama
+                Kantor AI 3D — GLB Model &amp; Animation Mixer
               </h2>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-purple-500/10 text-purple-400 border border-purple-500/20">
-                8 Karakter Aktif
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                Three.js + GLTFLoader
               </span>
             </div>
             <p className="text-xs text-slate-400">
-              Visualisasi real-time karakter AI agent bekerja di meja kantor virtual (Inspired by Kantor Kita)
+              Karakter 3D bergerak di meja kerja dengan AnimationMixer nyata &bull; {availableAnimations.length} Animasi GLB terdeteksi
             </p>
           </div>
         </div>
 
         {/* Ambient & Time-of-Day Controls */}
         <div className="flex items-center gap-2">
+          {/* Reset Camera View */}
+          <button
+            onClick={resetCamera}
+            className="p-2 rounded-xl bg-slate-800 text-slate-300 hover:text-white border border-slate-700 text-xs flex items-center gap-1"
+            title="Reset Posisi Kamera"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Reset View</span>
+          </button>
+
           {/* Audio Synthesizer */}
           <button
             onClick={toggleAudio}
@@ -447,31 +604,46 @@ export default function VirtualOffice() {
         </div>
       </div>
 
-      {/* Main Canvas + Character Inspection Split */}
+      {/* Main 3D Viewport + Character Control Split */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-0">
         
-        {/* Interactive Canvas Viewport (2 cols) */}
-        <div className="xl:col-span-2 relative p-4 bg-slate-950/80 flex flex-col items-center justify-center border-b xl:border-b-0 xl:border-r border-slate-800">
-          <canvas
-            ref={canvasRef}
-            width={720}
-            height={540}
-            onClick={handleCanvasClick}
-            className="w-full h-auto max-w-full rounded-2xl border border-slate-800 shadow-inner cursor-pointer"
-          />
-          <div className="mt-3 text-xs text-slate-400 flex items-center justify-between w-full px-2">
-            <span>💡 <em>Klik pada meja karakter untuk berinteraksi & kirim perintah WA</em></span>
-            <span className="font-mono text-indigo-400">FPS: 60 • Canvas 2.5D</span>
+        {/* 3D WebGL Canvas Container (2 cols) */}
+        <div className="xl:col-span-2 relative p-0 bg-slate-950 flex flex-col items-center justify-center border-b xl:border-b-0 xl:border-r border-slate-800 overflow-hidden">
+          
+          {/* Loading Indicator */}
+          {isLoading && (
+            <div className="absolute inset-0 bg-slate-950/90 z-20 flex flex-col items-center justify-center space-y-3">
+              <Bot className="w-10 h-10 text-indigo-400 animate-bounce" />
+              <div className="text-sm font-semibold text-white">Memuat Model 3D GLB Karakter...</div>
+              <div className="w-48 h-2 bg-slate-800 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-300"
+                  style={{ width: `${loadingProgress || 50}%` }}
+                />
+              </div>
+              <span className="text-xs text-slate-400 font-mono">GLTFLoader + AnimationMixer</span>
+            </div>
+          )}
+
+          {/* Three.js Mount Point */}
+          <div ref={mountRef} className="w-full h-[500px] cursor-grab active:cursor-grabbing" />
+
+          {/* Bottom Viewport Overlay */}
+          <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between text-xs text-slate-400 pointer-events-none bg-slate-950/60 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/5">
+            <span className="flex items-center gap-1.5">
+              <span>🖱️ <em>Drag untuk putar 3D &bull; Scroll untuk zoom &bull; Klik karakter untuk kontrol</em></span>
+            </span>
+            <span className="font-mono text-indigo-400 hidden sm:inline">Three.js WebGL &bull; Shadows &bull; 60 FPS</span>
           </div>
         </div>
 
-        {/* Character Inspector & Command Console (1 col) */}
-        <div className="p-5 flex flex-col justify-between bg-slate-900/50 space-y-4">
+        {/* Character Inspector & Animation Controller (1 col) */}
+        <div className="p-5 flex flex-col justify-between bg-slate-900/60 space-y-4">
           
           {selectedAgent ? (
             <div className="space-y-4">
               {/* Selected Agent Header */}
-              <div className="p-4 rounded-2xl border border-slate-800 bg-slate-950/60 flex items-start justify-between">
+              <div className="p-4 rounded-2xl border border-slate-800 bg-slate-950/70 flex items-start justify-between">
                 <div className="flex items-center gap-3">
                   <div
                     className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shadow-lg border border-white/10"
@@ -484,77 +656,74 @@ export default function VirtualOffice() {
                     <p className="text-xs text-slate-400">{selectedAgent.role}</p>
                   </div>
                 </div>
-                <span
-                  className={`text-[10px] uppercase font-mono px-2 py-0.5 rounded-full border ${
-                    selectedAgent.status === 'working'
-                      ? 'bg-blue-500/10 text-blue-400 border-blue-500/30'
-                      : selectedAgent.status === 'coffee'
-                      ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
-                      : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                  }`}
+                <button
+                  onClick={() => focusOnAgent(selectedAgent)}
+                  className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 text-xs flex items-center gap-1"
+                  title="Fokuskan Kamera 3D ke Karakter ini"
                 >
-                  {selectedAgent.status}
-                </span>
+                  <Eye className="w-3.5 h-3.5" />
+                </button>
               </div>
 
               {/* Status & Current Task */}
-              <div className="text-xs space-y-1.5 p-3 rounded-xl bg-slate-950/40 border border-slate-800">
+              <div className="text-xs space-y-1.5 p-3 rounded-xl bg-slate-950/50 border border-slate-800">
                 <div className="flex justify-between text-slate-400">
-                  <span>Aktivitas Sekarang:</span>
-                  <span className="text-slate-200 font-medium">{selectedAgent.currentTask || 'Standby'}</span>
+                  <span>Animasi 3D Aktif:</span>
+                  <span className="text-emerald-400 font-mono font-bold">{selectedAgent.currentAnim}</span>
                 </div>
                 <div className="flex justify-between text-slate-400">
-                  <span>Kata Kunci (Triggers):</span>
-                  <span className="text-indigo-400 font-mono">/{selectedAgent.id} ({selectedAgent.triggers.join(', ')})</span>
+                  <span>Tugas Sekarang:</span>
+                  <span className="text-slate-200 font-medium truncate max-w-[170px]">{selectedAgent.currentTask || 'Standby'}</span>
+                </div>
+                <div className="flex justify-between text-slate-400">
+                  <span>WhatsApp Trigger:</span>
+                  <span className="text-indigo-400 font-mono">/{selectedAgent.id}</span>
                 </div>
               </div>
 
-              {/* Action Buttons to toggle character behavior */}
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  onClick={() =>
-                    setAgents((prev) =>
-                      prev.map((a) =>
-                        a.id === selectedAgent.id ? { ...a, status: 'working' } : a
-                      )
-                    )
-                  }
-                  className="px-2 py-1.5 rounded-lg bg-blue-600/20 border border-blue-500/30 hover:bg-blue-600/30 text-blue-300 text-xs font-medium"
-                >
-                  ⚡ Set Kerja
-                </button>
-                <button
-                  onClick={() =>
-                    setAgents((prev) =>
-                      prev.map((a) =>
-                        a.id === selectedAgent.id ? { ...a, status: 'coffee' } : a
-                      )
-                    )
-                  }
-                  className="px-2 py-1.5 rounded-lg bg-amber-600/20 border border-amber-500/30 hover:bg-amber-600/30 text-amber-300 text-xs font-medium"
-                >
-                  ☕ Coffee Break
-                </button>
-                <button
-                  onClick={() =>
-                    setAgents((prev) =>
-                      prev.map((a) =>
-                        a.id === selectedAgent.id ? { ...a, status: 'idle' } : a
-                      )
-                    )
-                  }
-                  className="px-2 py-1.5 rounded-lg bg-emerald-600/20 border border-emerald-500/30 hover:bg-emerald-600/30 text-emerald-300 text-xs font-medium"
-                >
-                  💤 Set Idle
-                </button>
+              {/* Real GLB Animation Mixer Triggers */}
+              <div>
+                <label className="text-xs font-semibold text-slate-300 mb-2 flex items-center justify-between">
+                  <span>Trigger Animasi 3D (AnimationMixer):</span>
+                  <span className="text-[10px] text-slate-500 font-mono">14 Clips</span>
+                </label>
+                <div className="grid grid-cols-3 gap-1.5 max-h-36 overflow-y-auto p-1">
+                  {availableAnimations.map((animName) => {
+                    const isCurrent = selectedAgent.currentAnim === animName;
+                    return (
+                      <button
+                        key={animName}
+                        onClick={() => triggerAgentAnimation(selectedAgent.id, animName)}
+                        className={`px-2 py-1.5 rounded-lg text-[11px] font-medium border transition-all truncate flex items-center justify-center gap-1 ${
+                          isCurrent
+                            ? 'bg-indigo-600 text-white border-indigo-500 shadow-sm'
+                            : 'bg-slate-950/60 text-slate-300 border-slate-800 hover:border-slate-700 hover:bg-slate-800'
+                        }`}
+                        title={`Putar animasi ${animName}`}
+                      >
+                        {animName === 'Dance' && '🕺'}
+                        {animName === 'Wave' && '👋'}
+                        {animName === 'ThumbsUp' && '👍'}
+                        {animName === 'Yes' && '✅'}
+                        {animName === 'No' && '❌'}
+                        {animName === 'Sitting' && '🪑'}
+                        {animName === 'Idle' && '💤'}
+                        {animName === 'Walking' && '🚶'}
+                        {animName === 'Jump' && '🦘'}
+                        {animName === 'Punch' && '🥊'}
+                        <span>{animName}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
-              {/* Live Mini Chat / Activity Log */}
+              {/* Live WhatsApp Chat Log */}
               <div>
                 <label className="text-xs font-semibold text-slate-300 mb-1.5 block">
                   Aktivitas &amp; Interaksi WhatsApp:
                 </label>
-                <div className="h-44 overflow-y-auto space-y-2 p-3 rounded-xl bg-black/60 border border-slate-800 font-mono text-[11px]">
+                <div className="h-32 overflow-y-auto space-y-2 p-3 rounded-xl bg-black/60 border border-slate-800 font-mono text-[11px]">
                   {chatLog.map((log, idx) => (
                     <div key={idx} className="leading-relaxed">
                       <span className="text-slate-500">[{log.time}]</span>{' '}
@@ -576,7 +745,7 @@ export default function VirtualOffice() {
                 />
                 <button
                   type="submit"
-                  className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium flex items-center gap-1"
+                  className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium flex items-center gap-1 shadow-lg shadow-indigo-600/30"
                 >
                   <Send className="w-3.5 h-3.5" />
                 </button>
@@ -585,9 +754,9 @@ export default function VirtualOffice() {
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-center p-8 text-slate-500 space-y-3">
               <Bot className="w-12 h-12 text-slate-600" />
-              <h4 className="font-bold text-slate-300 text-sm">Pilih Karakter di Meja Kantor</h4>
+              <h4 className="font-bold text-slate-300 text-sm">Pilih Karakter di Ruangan 3D</h4>
               <p className="text-xs max-w-xs">
-                Klik salah satu karakter AI di kantor virtual untuk melihat status tugas, memantau aktivitas, atau memberi instruksi langsung.
+                Klik salah satu karakter 3D di ruangan kantor untuk memicu gerakan animasi, memantau tugas, atau memberi perintah WhatsApp.
               </p>
             </div>
           )}
